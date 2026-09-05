@@ -63,7 +63,7 @@ before(async () => {
   });
   customerUser = { id: custUser.id, userId: custUser.id, role: "CUSTOMER" };
 
-  const prod = await db.product.findFirstOrThrow({ where: { isRecurring: false } });
+  const prod = await db.product.findFirstOrThrow({ where: { sku: "EDGE-DEV-021" } });
   physicalProduct = {
     id: prod.id,
     price: Number(prod.price),

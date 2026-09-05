@@ -20,7 +20,14 @@ let product: { id: string; price: number; cost: number; maxDiscountPercent: numb
 const testQuotationIds: string[] = [];
 
 before(async () => {
-  const repUser = await db.user.findFirstOrThrow({ where: { role: "SALES_REP" } });
+  const repUser = await db.user.create({
+    data: {
+      name: `DH Rep ${suffix}`,
+      email: `dh-rep-${suffix}@dealflow360.io`,
+      passwordHash: "dummy",
+      role: "SALES_REP",
+    },
+  });
   rep = { id: repUser.id, userId: repUser.id, role: "SALES_REP" };
 
   let otherRepUser = await db.user.findFirst({
@@ -92,6 +99,12 @@ after(async () => {
     await db.quotation.deleteMany({
       where: { id: { in: testQuotationIds } },
     });
+  }
+  if (rep?.id) {
+    await db.user.delete({ where: { id: rep.id } }).catch(() => {});
+  }
+  if (otherRep?.id) {
+    await db.user.delete({ where: { id: otherRep.id } }).catch(() => {});
   }
 });
 
