@@ -5,11 +5,15 @@ import { FilePenLine } from "lucide-react";
 
 import { requireAreaAccess } from "@/lib/auth-guards";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { APPROVAL_LEVEL_LABELS } from "@/lib/labels";
 import {
   canEditQuotation,
   canViewQuotation,
 } from "@/lib/modules/quotations/guards";
 import { getQuotation } from "@/lib/modules/quotations/quotation-service";
+import { listApprovalsForQuotation } from "@/lib/modules/approvals/approval-service";
+import { ApprovalStageList, buildApprovalStages } from "@/components/approvals/approval-stage-list";
+import { RiskLevelBadge } from "@/components/approvals/risk-badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -63,6 +67,19 @@ export default async function QuotationDetailPage({
     status: quotation.status,
   });
 
+  const approvals = await listApprovalsForQuotation(quotation.id);
+  const approverNames = new Map<string, string>();
+  for (const approval of approvals) {
+    if (approval.approver) {
+      approverNames.set(approval.approver.id, approval.approver.name);
+    }
+  }
+  const stages = buildApprovalStages(
+    quotation.requiredApprovalLevel,
+    approvals,
+    Object.fromEntries(approverNames)
+  );
+
   return (
     <>
       <PageHeader
@@ -83,11 +100,28 @@ export default async function QuotationDetailPage({
         )}
       </PageHeader>
 
-      {quotation.status === "PENDING_APPROVAL" && (
+      {(quotation.status === "PENDING_APPROVAL" ||
+        quotation.status === "PENDING_MANAGER" ||
+        quotation.status === "PENDING_FINANCE") && (
         <div className="mb-6">
           <InfoBanner
-            title="Submitted for approval"
-            description="This quotation is pending review and can no longer be edited."
+            title={
+              quotation.status === "PENDING_FINANCE"
+                ? "Awaiting finance approval"
+                : quotation.status === "PENDING_MANAGER"
+                  ? "Awaiting manager approval"
+                  : "Submitted for approval"
+            }
+            description="This quotation is under review and can no longer be edited."
+          />
+        </div>
+      )}
+
+      {quotation.status === "APPROVED" && quotation.requiredApprovalLevel === "NONE" && (
+        <div className="mb-6">
+          <InfoBanner
+            title="Approved"
+            description="Discounts are within product limits — no approval was required."
           />
         </div>
       )}
@@ -232,6 +266,50 @@ export default async function QuotationDetailPage({
               </dl>
             </CardContent>
           </Card>
+
+          {(quotation.riskScore !== null || quotation.riskLevel !== null) && (
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Discount risk</CardTitle>
+                <CardDescription>
+                  Deterministic score computed at submission.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="flex flex-col gap-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <dt className="text-muted-foreground">Risk level</dt>
+                    <dd>
+                      <RiskLevelBadge level={quotation.riskLevel} />
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <dt className="text-muted-foreground">Risk score</dt>
+                    <dd className="font-medium tabular-nums">
+                      {quotation.riskScore ?? "—"}
+                      <span className="text-muted-foreground"> / 100</span>
+                    </dd>
+                  </div>
+                  {quotation.requiredApprovalLevel && (
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">
+                        Required approval
+                      </dt>
+                      <dd className="font-medium">
+                        {APPROVAL_LEVEL_LABELS[quotation.requiredApprovalLevel]}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+                {stages.length > 0 && (
+                  <Separator className="my-3" />
+                )}
+                {stages.length > 0 && (
+                  <ApprovalStageList stages={stages} />
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </>

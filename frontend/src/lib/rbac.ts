@@ -24,7 +24,7 @@ const allowedRoles = (...roles: Role[]) => roles;
 const AREA_ACCESS: Record<AppArea, Role[]> = {
   dashboard: allowedRoles("ADMIN", "SALES_REP", "SALES_MANAGER", "FINANCE", "OPERATIONS", "CUSTOMER"),
   quotations: allowedRoles("ADMIN", "SALES_REP", "SALES_MANAGER"),
-  approvals: allowedRoles("ADMIN", "SALES_MANAGER"),
+  approvals: allowedRoles("ADMIN", "SALES_MANAGER", "FINANCE"),
   fulfillment: allowedRoles("ADMIN", "OPERATIONS"),
   billing: allowedRoles("ADMIN", "FINANCE"),
   "deal-health": allowedRoles("ADMIN", "SALES_MANAGER", "FINANCE", "OPERATIONS"),

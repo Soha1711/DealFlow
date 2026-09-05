@@ -18,6 +18,10 @@ import {
 const STATUS_OPTIONS = [
   { value: "DRAFT", label: "Draft" },
   { value: "PENDING_APPROVAL", label: "Pending approval" },
+  { value: "PENDING_MANAGER", label: "Pending manager" },
+  { value: "PENDING_FINANCE", label: "Pending finance" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "REJECTED", label: "Rejected" },
 ];
 
 export function QuotationFilters({

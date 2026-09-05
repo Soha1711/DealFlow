@@ -1,7 +1,10 @@
 import type {
+  ApprovalLevel,
+  ApprovalStatus,
   BillingInterval,
   CustomerTier,
   DiscountApprovalLevel,
+  DiscountRiskLevel,
   QuotationStatus,
 } from "@prisma/client";
 
@@ -27,6 +30,9 @@ export const BILLING_INTERVAL_LABELS: Record<BillingInterval, string> = {
 export const QUOTATION_STATUS_LABELS: Record<QuotationStatus, string> = {
   DRAFT: "Draft",
   PENDING_APPROVAL: "Pending approval",
+  DISCOUNT_CHECK: "Discount check",
+  PENDING_MANAGER: "Pending manager approval",
+  PENDING_FINANCE: "Pending finance approval",
   APPROVED: "Approved",
   REJECTED: "Rejected",
   UNDER_NEGOTIATION: "Under negotiation",
@@ -42,10 +48,44 @@ export const QUOTATION_STATUS_LABELS: Record<QuotationStatus, string> = {
 export const QUOTATION_STATUS_BADGE_CLASSES: Record<QuotationStatus, string> = {
   DRAFT: "bg-slate-100 text-slate-700 hover:bg-slate-100",
   PENDING_APPROVAL: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  DISCOUNT_CHECK: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+  PENDING_MANAGER: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  PENDING_FINANCE: "bg-amber-50 text-amber-700 hover:bg-amber-50",
   APPROVED: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
   REJECTED: "bg-red-50 text-red-700 hover:bg-red-50",
   UNDER_NEGOTIATION: "bg-blue-50 text-blue-700 hover:bg-blue-50",
   CONFIRMED: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
   FULFILLING: "bg-blue-50 text-blue-700 hover:bg-blue-50",
   COMPLETED: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+};
+
+export const APPROVAL_STATUS_LABELS: Record<ApprovalStatus, string> = {
+  PENDING: "Pending",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+};
+
+export const APPROVAL_STATUS_BADGE_CLASSES: Record<ApprovalStatus, string> = {
+  PENDING: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  APPROVED: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  REJECTED: "bg-red-50 text-red-700 hover:bg-red-50",
+};
+
+export const APPROVAL_LEVEL_STAGE_LABELS: Record<ApprovalLevel, string> = {
+  MANAGER: "Manager approval",
+  FINANCE: "Finance approval",
+};
+
+export const DISCOUNT_RISK_LABELS: Record<DiscountRiskLevel, string> = {
+  LOW: "Low",
+  MEDIUM: "Medium",
+  HIGH: "High",
+  CRITICAL: "Critical",
+};
+
+export const DISCOUNT_RISK_BADGE_CLASSES: Record<DiscountRiskLevel, string> = {
+  LOW: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  MEDIUM: "bg-blue-50 text-blue-700 hover:bg-blue-50",
+  HIGH: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  CRITICAL: "bg-red-50 text-red-700 hover:bg-red-50",
 };

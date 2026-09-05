@@ -70,9 +70,13 @@ export const listQuotationsQuerySchema = z.object({
     .max(100, "pageSize must be at most 100")
     .default(20),
   q: z.string().trim().max(100, "Search term is too long").optional(),
-  status: z.enum(["DRAFT", "PENDING_APPROVAL"], {
-    message: "status must be DRAFT or PENDING_APPROVAL",
-  }).optional(),
+  status: z.enum(
+    ["DRAFT", "PENDING_APPROVAL", "PENDING_MANAGER", "PENDING_FINANCE", "APPROVED", "REJECTED"],
+    {
+      message:
+        "status must be DRAFT, PENDING_APPROVAL, PENDING_MANAGER, PENDING_FINANCE, APPROVED or REJECTED",
+    }
+  ).optional(),
 });
 
 export type ListQuotationsQuery = z.infer<typeof listQuotationsQuerySchema>;

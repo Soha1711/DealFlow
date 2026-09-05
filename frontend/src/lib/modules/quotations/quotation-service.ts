@@ -3,6 +3,7 @@ import "server-only";
 import type { Prisma, Role } from "@prisma/client";
 
 import { db } from "@/lib/db";
+import { routeSubmittedQuotation } from "@/lib/modules/approvals/approval-service";
 import {
   badRequest,
   conflict,
@@ -158,7 +159,7 @@ export type ListQuotationsParams = {
   page: number;
   pageSize: number;
   search?: string;
-  status?: "DRAFT" | "PENDING_APPROVAL";
+  status?: "DRAFT" | "PENDING_APPROVAL" | "PENDING_MANAGER" | "PENDING_FINANCE" | "APPROVED" | "REJECTED";
 };
 
 export async function listQuotations(params: ListQuotationsParams) {
@@ -289,9 +290,15 @@ export async function submitQuotation(id: string, context: OwnedContext) {
     throw forbidden("You can only submit your own quotations.");
   }
 
-  return db.quotation.update({
-    where: { id },
-    data: { status: "PENDING_APPROVAL" },
-    include: quotationInclude,
+  // Submit runs the deterministic discount check and routes the quotation:
+  // DRAFT → DISCOUNT_CHECK → APPROVED (LOW risk) or PENDING_MANAGER (any
+  // approval depth). Everything stays in one transaction with numbering and
+  // pricing so the routing decision is atomic and auditable.
+  return db.$transaction(async (tx) => {
+    await routeSubmittedQuotation(tx, id);
+    return tx.quotation.findUniqueOrThrow({
+      where: { id },
+      include: quotationInclude,
+    });
   });
 }

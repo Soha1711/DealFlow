@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test tests/quotation-pricing.test.ts tests/quotation-numbering.test.ts tests/quotation-guards.test.ts tests/quotation-validation.test.ts",
+    "test": "tsx --test tests/quotation-pricing.test.ts tests/quotation-numbering.test.ts tests/quotation-guards.test.ts tests/quotation-validation.test.ts tests/discount-risk.test.ts tests/approval-transitions.test.ts tests/approval-guards.test.ts tests/approval-validation.test.ts tests/approval-workflow.integration.test.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

@@ -188,14 +188,35 @@ describe("listQuotationsQuerySchema", () => {
     assert.equal(listQuotationsQuerySchema.safeParse({ pageSize: "500" }).success, false);
   });
 
+  it("accepts the Phase 2 and Phase 3 status values", () => {
+    for (const status of [
+      "DRAFT",
+      "PENDING_APPROVAL",
+      "PENDING_MANAGER",
+      "PENDING_FINANCE",
+      "APPROVED",
+      "REJECTED",
+    ]) {
+      assert.equal(
+        listQuotationsQuerySchema.safeParse({ status }).success,
+        true,
+        `status ${status} should be accepted`
+      );
+    }
+  });
+
   it("rejects unsupported status values", () => {
     assert.equal(
-      listQuotationsQuerySchema.safeParse({ status: "APPROVED" }).success,
+      listQuotationsQuerySchema.safeParse({ status: "CONFIRMED" }).success,
       false
     );
     assert.equal(
-      listQuotationsQuerySchema.safeParse({ status: "DRAFT" }).success,
-      true
+      listQuotationsQuerySchema.safeParse({ status: "FULFILLING" }).success,
+      false
+    );
+    assert.equal(
+      listQuotationsQuerySchema.safeParse({ status: "BOGUS" }).success,
+      false
     );
   });
 

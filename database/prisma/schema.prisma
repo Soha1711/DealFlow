@@ -34,6 +34,24 @@ enum DiscountApprovalLevel {
   MANAGER_AND_FINANCE
 }
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApprovalLevel {
+  MANAGER
+  FINANCE
+}
+
+enum DiscountRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 enum BillingInterval {
   MONTHLY
   QUARTERLY
@@ -43,6 +61,9 @@ enum BillingInterval {
 enum QuotationStatus {
   DRAFT
   PENDING_APPROVAL
+  DISCOUNT_CHECK
+  PENDING_MANAGER
+  PENDING_FINANCE
   APPROVED
   REJECTED
   UNDER_NEGOTIATION
@@ -63,6 +84,7 @@ model User {
   role         Role
   salesTeamId  String?
   quotations   Quotation[]
+  approvals    Approval[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
@@ -176,27 +198,52 @@ model SubscriptionPlan {
 // ---------------------------------------------------------------------------
 
 model Quotation {
-  id              String          @id @default(cuid())
-  quotationNumber String          @unique
-  customerId      String
-  salesRepId      String
-  status          QuotationStatus @default(DRAFT)
-  subtotal        Decimal         @default(0) @db.Decimal(12, 2)
-  discountTotal   Decimal         @default(0) @db.Decimal(12, 2)
-  total           Decimal         @default(0) @db.Decimal(12, 2)
-  margin          Decimal         @default(0) @db.Decimal(12, 2)
-  validUntil      DateTime?
-  customer        Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  salesRep        User            @relation(fields: [salesRepId], references: [id], onDelete: Restrict)
-  lines           QuotationLine[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id                     String                @id @default(cuid())
+  quotationNumber        String                @unique
+  customerId             String
+  salesRepId             String
+  status                 QuotationStatus       @default(DRAFT)
+  subtotal               Decimal               @default(0) @db.Decimal(12, 2)
+  discountTotal          Decimal               @default(0) @db.Decimal(12, 2)
+  total                  Decimal               @default(0) @db.Decimal(12, 2)
+  margin                 Decimal               @default(0) @db.Decimal(12, 2)
+  validUntil             DateTime?
+  // Deterministic discount-governance snapshot, computed at submit time.
+  riskScore              Int?
+  riskLevel              DiscountRiskLevel?
+  requiredApprovalLevel  DiscountApprovalLevel?
+  customer               Customer              @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  salesRep               User                  @relation(fields: [salesRepId], references: [id], onDelete: Restrict)
+  lines                  QuotationLine[]
+  approvals              Approval[]
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 
   @@index([customerId])
   @@index([salesRepId])
   @@index([status])
+  @@index([riskLevel])
   @@index([createdAt])
   @@map("quotations")
+}
+
+model Approval {
+  id          String              @id @default(cuid())
+  quotationId String
+  level       ApprovalLevel
+  approverId  String?
+  status      ApprovalStatus      @default(PENDING)
+  reason      String?
+  actedAt     DateTime?
+  quotation   Quotation           @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  approver    User?               @relation(fields: [approverId], references: [id], onDelete: SetNull)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([quotationId])
+  @@index([status])
+  @@index([approverId])
+  @@map("approvals")
 }
 
 model QuotationLine {
