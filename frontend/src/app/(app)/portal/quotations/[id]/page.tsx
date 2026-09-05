@@ -21,8 +21,8 @@ import { InfoBanner } from "@/components/layout/info-banner";
 import { PageHeader } from "@/components/layout/page-header";
 import { QuotationStatusBadge } from "@/components/quotations/status-badge";
 import { AcceptQuoteButton } from "@/components/portal/accept-quote-button";
-import { NegotiateDialog } from "@/components/portal/negotiate-dialog";
-import { NegotiationTimeline } from "@/components/portal/negotiation-timeline";
+import { NegotiateDialog, type QuotationLineItem } from "@/components/portal/negotiate-dialog";
+import { NegotiationTimeline, type NegotiationItem } from "@/components/portal/negotiation-timeline";
 
 export const metadata: Metadata = { title: "Quotation Review · Customer Portal" };
 
@@ -52,6 +52,40 @@ export default async function CustomerQuotationDetailPage({
   const lines = quotation.lines ?? [];
   const negotiations = quotation.negotiations ?? [];
 
+  const dialogLines: QuotationLineItem[] = lines.map((line) => ({
+    id: line.id,
+    productId: line.productId,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice.toString(),
+    discountPercent: Number(line.discountPercent),
+    discountAmount: line.discountAmount.toString(),
+    lineTotal: line.lineTotal.toString(),
+    product: line.product
+      ? {
+          id: line.product.id,
+          name: line.product.name,
+          sku: line.product.sku,
+          price: line.product.price.toString(),
+        }
+      : undefined,
+  }));
+
+  const timelineNegotiations: NegotiationItem[] = negotiations.map((item) => ({
+    id: item.id,
+    status: item.status,
+    message: item.message,
+    responseMessage: item.responseMessage,
+    createdAt: item.createdAt.toISOString(),
+    actedAt: item.actedAt ? item.actedAt.toISOString() : null,
+    createdBy: item.createdBy
+      ? { name: item.createdBy.name, email: item.createdBy.email }
+      : undefined,
+    actedBy: item.actedBy
+      ? { name: item.actedBy.name, email: item.actedBy.email }
+      : null,
+    proposedChanges: item.proposedChanges ?? undefined,
+  }));
+
   return (
     <>
       <div className="mb-4">
@@ -72,7 +106,7 @@ export default async function CustomerQuotationDetailPage({
           <QuotationStatusBadge status={quotation.status} />
           {quotation.status === "APPROVED" && (
             <>
-              <NegotiateDialog quotationId={quotation.id} lines={lines} />
+              <NegotiateDialog quotationId={quotation.id} lines={dialogLines} />
               <AcceptQuoteButton quotationId={quotation.id} />
             </>
           )}
@@ -157,7 +191,7 @@ export default async function CustomerQuotationDetailPage({
 
             <div className="mt-6">
               <NegotiationTimeline
-                negotiations={negotiations}
+                negotiations={timelineNegotiations}
                 customerId={customerId}
               />
             </div>

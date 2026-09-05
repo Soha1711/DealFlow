@@ -10,13 +10,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type QuotationLineItem = {
+export type QuotationLineItem = {
   id: string;
   productId: string;
   quantity: number;
+  unitPrice?: string;
+  discountPercent?: number;
+  discountAmount?: string;
+  lineTotal?: string;
   product?: {
+    id?: string;
     name: string;
     sku: string;
+    price?: string;
   };
 };
 
