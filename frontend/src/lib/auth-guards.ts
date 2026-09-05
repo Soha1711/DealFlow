@@ -12,6 +12,7 @@ export type CurrentUser = {
   name: string;
   email: string;
   role: Role;
+  customerId?: string | null;
 };
 
 /**
@@ -27,6 +28,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     name: session.user.name ?? "",
     email: session.user.email ?? "",
     role: session.user.role,
+    customerId: session.user.customerId ?? null,
   };
 });
 

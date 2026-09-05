@@ -2,6 +2,7 @@ import NextAuth, { type User } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import type { Role } from "@prisma/client";
 
 import { db } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
@@ -39,7 +40,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           email: user.email,
           role: user.role,
-        } satisfies User & { role: string };
+          customerId: user.customerId,
+        } satisfies User & { role: string; customerId?: string | null };
       },
     }),
   ],
@@ -48,12 +50,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = user.role as string;
+        token.customerId = user.customerId;
       }
       return token;
     },
     session({ session, token }) {
       if (token.sub) session.user.id = token.sub;
-      if (token.role) session.user.role = token.role as string;
+      if (token.role) session.user.role = token.role as Role;
+      if (token.customerId) session.user.customerId = token.customerId;
       return session;
     },
   },

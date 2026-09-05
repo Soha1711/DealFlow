@@ -15,6 +15,7 @@ import {
 
 export const NAV_ICONS = {
   dashboard: LayoutDashboard,
+  portal: Building2,
   quotations: FileText,
   approvals: CheckSquare2,
   fulfillment: Boxes,

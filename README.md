@@ -192,6 +192,31 @@ are authoritative.
 
 See the docs for the exact invoice/subscription state machines.
 
+## Phase 7 — Customer Portal & Quotation Negotiation
+
+Phase 7 implements customer-facing access and real-time structured quotation negotiations:
+
+- **Customer Portal (`/portal`)**:
+  - Customers (e.g. `jordan.lee@dealflow360.io`) log in and see **only** their own quotations linked via `session.user.customerId`.
+  - Strict server-side IDOR protection: accessing another account's quotation returns 404/403.
+  - Commercial privacy: sensitive margin rates, product costs, discount risk scores, and internal approval logs are completely stripped for customer responses.
+  - Customers can accept an `APPROVED` proposal directly (`APPROVED → CONFIRMED`) or request changes (`APPROVED → UNDER_NEGOTIATION`).
+- **Negotiation Workflow**:
+  - Customer submits a negotiation message with optional target total and proposed line quantities/discounts (`PENDING`).
+  - Assigned Sales Rep reviews on the quotation detail page (`/quotations/[id]`) and can:
+    - **Accept**: Applies changes to quotation lines. Re-evaluates pricing authoritatively with the Phase 2 pricing engine (`pricing.ts`) and routes through the Phase 3 discount-risk & approval workflow (`approval-service.ts`) if commercial thresholds/margins are exceeded.
+    - **Counter**: Proposes alternative terms back to the customer (`COUNTERED`). The customer can respond (`PENDING`).
+    - **Reject**: Declines requested terms with a reason (`REJECTED`) and cleanly restores quotation status back to `APPROVED`.
+- Full architecture and API specifications are **documented in [`docs/customer-portal-negotiation.md`](docs/customer-portal-negotiation.md)**.
+
+### Negotiation demo flow
+
+1. Log in as **Jordan Lee** (`jordan.lee@dealflow360.io`, Customer for Northwind Traders Inc).
+2. Browse to **Customer Portal** (`/portal`) and select quotation `QUOT-2026-0016` (currently `UNDER_NEGOTIATION`).
+3. View the negotiation timeline with Maya Chen (Sales Rep).
+4. Log in as **Maya Chen** (`maya.chen@dealflow360.io`, Sales Rep) and open `/quotations/[id]` for `QUOT-2026-0016`.
+5. Under **Customer Negotiation**, review the request, counter or accept modifications.
+
 ## Phase 1 feature summary
 
 - Next.js 16 + TypeScript application, Tailwind CSS v4 and shadcn/ui.

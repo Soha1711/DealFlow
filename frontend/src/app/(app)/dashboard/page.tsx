@@ -19,6 +19,7 @@ import { NAV_ICONS } from "@/lib/nav-icons";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatCard } from "@/components/layout/stat-card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -170,9 +171,16 @@ export default async function DashboardPage() {
       </div>
 
       {user.role === "CUSTOMER" && (
-        <div className="mt-6 rounded-lg border border-dashed border-border bg-white px-4 py-3 text-sm text-muted-foreground">
-          Your customer portal — including quotation review and negotiation — lands
-          in a later phase.
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-blue-200 bg-blue-50/50 px-5 py-4 text-sm text-blue-900">
+          <div>
+            <p className="font-semibold">Welcome to your Customer Portal</p>
+            <p className="text-xs text-blue-700">
+              Review quotations, collaborate on commercial terms, and submit negotiation requests directly to your sales team.
+            </p>
+          </div>
+          <Button asChild size="sm">
+            <Link href="/portal">View My Quotations</Link>
+          </Button>
         </div>
       )}
     </>

@@ -11,6 +11,7 @@ import type {
   FulfillmentStatus,
   InvoiceStatus,
   InvoiceType,
+  NegotiationStatus,
   PaymentStatus,
   QuotationStatus,
   SubscriptionStatus,
@@ -213,4 +214,18 @@ export const FULFILLMENT_ALLOCATION_STATUS_BADGE_CLASSES: Record<FulfillmentAllo
   ALLOCATED: "bg-blue-50 text-blue-700 hover:bg-blue-50",
   FULFILLED: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
   RELEASED: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+};
+
+export const NEGOTIATION_STATUS_LABELS: Record<NegotiationStatus, string> = {
+  PENDING: "Pending review",
+  COUNTERED: "Counter proposed",
+  ACCEPTED: "Accepted",
+  REJECTED: "Declined",
+};
+
+export const NEGOTIATION_STATUS_BADGE_CLASSES: Record<NegotiationStatus, string> = {
+  PENDING: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  COUNTERED: "bg-blue-50 text-blue-700 hover:bg-blue-50",
+  ACCEPTED: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  REJECTED: "bg-red-50 text-red-700 hover:bg-red-50",
 };

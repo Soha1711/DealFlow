@@ -12,6 +12,7 @@ import { createBillingFromQuotation } from "../src/lib/modules/billing/billing-s
 import { issueInvoice } from "../src/lib/modules/billing/invoice-service";
 import { recordPayment } from "../src/lib/modules/billing/payment-service";
 import { billSubscription } from "../src/lib/modules/billing/subscription-service";
+import { submitCustomerNegotiation } from "../src/lib/modules/negotiations/negotiation-service";
 
 const prisma = new PrismaClient();
 
@@ -116,6 +117,17 @@ async function main() {
     });
   }
   console.log(`  customer: ${seedCustomers.length} accounts upserted`);
+
+  const northwindCustomer = await prisma.customer.findUnique({
+    where: { email: "billing@northwindtraders.com" },
+  });
+  if (northwindCustomer) {
+    await prisma.user.updateMany({
+      where: { email: "jordan.lee@dealflow360.io" },
+      data: { customerId: northwindCustomer.id },
+    });
+    console.log("  customer-link: jordan.lee linked to Northwind Traders Inc");
+  }
 
   const seedPlans = [
     { name: "CRM Enterprise", price: 240.0, billingInterval: BillingInterval.ANNUAL },
@@ -512,6 +524,47 @@ async function main() {
           );
         }
       }
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Phase 7 demo: customer quotation negotiation
+  // -----------------------------------------------------------------------
+  const existingNegotiations = await prisma.quotationNegotiation.count();
+  if (existingNegotiations > 0) {
+    console.log("  negotiation: demo scenarios skipped (negotiations already exist)");
+  } else {
+    const jordan = await prisma.user.findUnique({
+      where: { email: "jordan.lee@dealflow360.io" },
+    });
+    const maya = await prisma.user.findUnique({
+      where: { email: "maya.chen@dealflow360.io" },
+    });
+    const northwind = await prisma.customer.findUnique({
+      where: { email: "billing@northwindtraders.com" },
+    });
+    const beaconEdge = await prisma.product.findUnique({
+      where: { sku: "EDGE-DEV-021" },
+    });
+
+    if (jordan && maya && northwind && beaconEdge) {
+      const q = await createQuotation({
+        salesRepId: maya.id,
+        customerId: northwind.id,
+        lines: [
+          { productId: beaconEdge.id, quantity: 2, unitPrice: 999, discountPercent: 5 },
+        ],
+      });
+      await submitQuotation(q.id, { userId: maya.id, role: Role.SALES_REP });
+      await submitCustomerNegotiation(q.id, northwind.id, jordan.id, {
+        message:
+          "We are planning to deploy the Beacon Edge Device across 4 distribution hubs. If we commit to 4 units, can you provide a 15% volume discount?",
+        targetTotal: 3400,
+        proposedLines: [
+          { productId: beaconEdge.id, requestedQuantity: 4, requestedDiscountPercent: 15 },
+        ],
+      });
+      console.log(`  negotiation demo: ${q.quotationNumber} submitted UNDER_NEGOTIATION`);
     }
   }
 

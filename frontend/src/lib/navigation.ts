@@ -28,6 +28,12 @@ export const appNav: NavSection[] = [
     ],
   },
   {
+    title: "Customer Portal",
+    items: [
+      { title: "My Quotations", href: "/portal", area: "portal", icon: "portal" },
+    ],
+  },
+  {
     title: "Sales",
     items: [
       { title: "Quotations", href: "/quotations", area: "quotations", icon: "quotations" },

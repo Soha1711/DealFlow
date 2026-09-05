@@ -15,6 +15,9 @@ import { listApprovalsForQuotation } from "@/lib/modules/approvals/approval-serv
 import { getFulfillmentForQuotation } from "@/lib/modules/fulfillment/fulfillment-service";
 import { getBillingForQuotation } from "@/lib/modules/billing/billing-service";
 import { canManageBilling } from "@/lib/modules/billing/billing-guards";
+import { listNegotiationsForQuotation } from "@/lib/modules/negotiations/negotiation-service";
+import { canSalesRepActOnNegotiation } from "@/lib/modules/negotiations/negotiation-guards";
+import { NegotiationPanel } from "@/components/quotations/negotiation-panel";
 import { ApprovalStageList, buildApprovalStages } from "@/components/approvals/approval-stage-list";
 import { RiskLevelBadge } from "@/components/approvals/risk-badge";
 import { Button } from "@/components/ui/button";
@@ -107,6 +110,14 @@ export default async function QuotationDetailPage({
   const hasBilling =
     billing.invoices.length > 0 || billing.subscriptions.length > 0;
 
+  const negotiations = await listNegotiationsForQuotation(quotation.id).catch(() => []);
+  const canActNegotiation = canSalesRepActOnNegotiation({
+    role: user.role,
+    userId: user.id,
+    salesRepId: quotation.salesRepId,
+    quotationStatus: quotation.status,
+  });
+
   return (
     <>
       <PageHeader
@@ -162,8 +173,18 @@ export default async function QuotationDetailPage({
         </div>
       )}
 
+      {quotation.status === "UNDER_NEGOTIATION" && (
+        <div className="mb-6">
+          <InfoBanner
+            title="Quotation Under Negotiation"
+            description="The customer has submitted a change request. Review their proposal below to accept, counter, or decline."
+          />
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="bg-white lg:col-span-2">
+        <div className="flex flex-col gap-6 lg:col-span-2">
+          <Card className="bg-white">
           <CardHeader>
             <CardTitle>Line items</CardTitle>
             <CardDescription>
@@ -234,7 +255,18 @@ export default async function QuotationDetailPage({
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-6">
+        {(negotiations.length > 0 || quotation.status === "UNDER_NEGOTIATION") && (
+          <NegotiationPanel
+            quotationId={quotation.id}
+            quotationStatus={quotation.status}
+            negotiations={negotiations}
+            lines={quotation.lines}
+            canAct={canActNegotiation}
+          />
+        )}
+      </div>
+
+      <div className="flex flex-col gap-6">
           <Card className="bg-white">
             <CardHeader>
               <CardTitle>Details</CardTitle>

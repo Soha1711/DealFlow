@@ -72,6 +72,13 @@ enum QuotationStatus {
   COMPLETED
 }
 
+enum NegotiationStatus {
+  PENDING
+  COUNTERED
+  ACCEPTED
+  REJECTED
+}
+
 enum FulfillmentStatus {
   PENDING_ALLOCATION
   ALLOCATED
@@ -144,18 +151,23 @@ enum BillingScheduleStatus {
 // ---------------------------------------------------------------------------
 
 model User {
-  id           String       @id @default(cuid())
-  name         String
-  email        String       @unique
-  passwordHash String
-  role         Role
-  salesTeamId  String?
-  quotations   Quotation[]
-  approvals    Approval[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id                  String                 @id @default(cuid())
+  name                String
+  email               String                 @unique
+  passwordHash        String
+  role                Role
+  salesTeamId         String?
+  customerId          String?
+  customer            Customer?              @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  quotations          Quotation[]
+  approvals           Approval[]
+  negotiationsCreated QuotationNegotiation[] @relation("NegotiationCreatedBy")
+  negotiationsActed   QuotationNegotiation[] @relation("NegotiationActedBy")
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
 
   @@index([role])
+  @@index([customerId])
   @@map("users")
 }
 
@@ -246,6 +258,7 @@ model Quotation {
   fulfillments           Fulfillment[]
   invoices               Invoice[]
   subscriptions          Subscription[]
+  negotiations           QuotationNegotiation[]
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
 
@@ -332,15 +345,17 @@ model InventoryReservation {
 // ---------------------------------------------------------------------------
 
 model Customer {
-  id            String         @id @default(cuid())
+  id            String                 @id @default(cuid())
   name          String
-  email         String         @unique
-  tier          CustomerTier   @default(STANDARD)
+  email         String                 @unique
+  tier          CustomerTier           @default(STANDARD)
+  users         User[]
   quotations    Quotation[]
   invoices      Invoice[]
   subscriptions Subscription[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  negotiations  QuotationNegotiation[]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
 
   @@map("customers")
 }
@@ -532,4 +547,33 @@ model QuotationLine {
   @@index([quotationId])
   @@index([productId])
   @@map("quotation_lines")
+}
+
+// ---------------------------------------------------------------------------
+// Customer Portal & Quotation Negotiation (Phase 7)
+// ---------------------------------------------------------------------------
+
+model QuotationNegotiation {
+  id              String            @id @default(cuid())
+  quotationId     String
+  customerId      String
+  status          NegotiationStatus @default(PENDING)
+  message         String
+  proposedChanges Json?
+  responseMessage String?
+  createdById     String
+  actedById       String?
+  actedAt         DateTime?
+  quotation       Quotation         @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  customer        Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy       User              @relation("NegotiationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  actedBy         User?             @relation("NegotiationActedBy", fields: [actedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([quotationId])
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("quotation_negotiations")
 }
