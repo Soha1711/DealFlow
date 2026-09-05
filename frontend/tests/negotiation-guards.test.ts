@@ -152,7 +152,12 @@ describe("sanitizeQuotationForCustomer", () => {
       ],
     };
 
-    const sanitized: any = sanitizeQuotationForCustomer(rawQuotation);
+    const sanitized = sanitizeQuotationForCustomer(rawQuotation) as Record<string, unknown> & {
+      id: string;
+      quotationNumber: string;
+      total: number;
+      lines: Array<{ lineTotal: number; product: { name: string } }>;
+    };
 
     // Verify customer visible fields are preserved
     assert.equal(sanitized.id, "q-1");

@@ -27,10 +27,9 @@ export type NegotiationItem = {
 
 export function NegotiationTimeline({
   negotiations = [],
-  customerId: _customerId,
 }: {
   negotiations: NegotiationItem[];
-  customerId: string;
+  customerId?: string;
 }) {
   const router = useRouter();
   const [activeNegotiationId, setActiveNegotiationId] = useState<string | null>(null);

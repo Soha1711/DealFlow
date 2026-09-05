@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Building2, Calendar, FileText, TriangleAlert } from "lucide-react";
+import { ArrowRight, Building2, TriangleAlert } from "lucide-react";
 
 import { requireAreaAccess } from "@/lib/auth-guards";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -65,7 +65,7 @@ export default async function CustomerPortalPage({
   const parsed = listPortalQuotationsQuerySchema.safeParse(flattened);
   const query = parsed.success ? parsed.data : { page: 1, pageSize: 20 };
 
-  let result;
+  let result: Awaited<ReturnType<typeof listCustomerQuotations>>;
   try {
     result = await listCustomerQuotations(customerId, query);
   } catch {
@@ -86,7 +86,7 @@ export default async function CustomerPortalPage({
     );
   }
 
-  const { data, pagination: _pagination } = result;
+  const { data } = result;
 
   return (
     <>

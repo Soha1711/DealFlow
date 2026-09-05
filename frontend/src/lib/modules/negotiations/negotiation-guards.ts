@@ -101,34 +101,32 @@ export function sanitizeQuotationForCustomer<
         cost?: unknown;
         maxDiscountPercent?: unknown;
         isRecurring: boolean;
-      };
+      } | null;
     }>;
     negotiations?: unknown;
   },
 >(quotation: T) {
-  const {
-    margin: _margin,
-    riskScore: _riskScore,
-    riskLevel: _riskLevel,
-    requiredApprovalLevel: _requiredApprovalLevel,
-    approvals: _approvals,
-    lines,
-    ...rest
-  } = quotation;
+  const rest = { ...quotation };
+  delete (rest as { margin?: unknown }).margin;
+  delete (rest as { riskScore?: unknown }).riskScore;
+  delete (rest as { riskLevel?: unknown }).riskLevel;
+  delete (rest as { requiredApprovalLevel?: unknown }).requiredApprovalLevel;
+  delete (rest as { approvals?: unknown }).approvals;
+
+  const sanitizedLines = quotation.lines?.map((line) => {
+    const lineCopy = { ...line };
+    delete (lineCopy as { margin?: unknown }).margin;
+    if (line.product) {
+      const prodCopy = { ...line.product };
+      delete (prodCopy as { cost?: unknown }).cost;
+      delete (prodCopy as { maxDiscountPercent?: unknown }).maxDiscountPercent;
+      lineCopy.product = prodCopy;
+    }
+    return lineCopy;
+  });
 
   return {
     ...rest,
-    lines: lines?.map((line) => {
-      const { margin: _lineMargin, product, ...lineRest } = line;
-      let sanitizedProduct = undefined;
-      if (product) {
-        const { cost: _cost, maxDiscountPercent: _maxDiscount, ...prodRest } = product;
-        sanitizedProduct = prodRest;
-      }
-      return {
-        ...lineRest,
-        ...(sanitizedProduct ? { product: sanitizedProduct } : {}),
-      };
-    }),
+    lines: sanitizedLines,
   };
 }

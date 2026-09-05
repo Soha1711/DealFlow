@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
 import type { FormEvent } from "react";
 
+import type { Decimal } from "@prisma/client/runtime/library";
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,13 +16,13 @@ type LineData = {
   id: string;
   productId: string;
   quantity: number;
-  unitPrice: number | string;
+  unitPrice: number | string | Decimal;
   discountPercent: number;
   product: {
     id: string;
     name: string;
     sku: string;
-    price: number | string;
+    price: number | string | Decimal;
   };
 };
 

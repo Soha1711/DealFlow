@@ -217,6 +217,33 @@ Phase 7 implements customer-facing access and real-time structured quotation neg
 4. Log in as **Maya Chen** (`maya.chen@dealflow360.io`, Sales Rep) and open `/quotations/[id]` for `QUOT-2026-0016`.
 5. Under **Customer Negotiation**, review the request, counter or accept modifications.
 
+## Phase 8 — Deal Health & Deal Risk Intelligence
+
+Phase 8 introduces a deterministic, real-time operational deal risk evaluation engine:
+
+- **Deterministic Scoring Engine (`0–100`)**:
+  - Authoritative scores calculated dynamically from transactional signals (margin rate, discount overage, approval delays, warehouse backorders, delinquent invoices, negotiation stalling, and quote expiration).
+  - Categorized health levels: **`HEALTHY`** (75–100), **`AT_RISK`** (45–74), and **`CRITICAL`** (0–44).
+  - Explainable factors: every point deduction explains *why* the deal was penalized.
+- **Automated Anomaly Detection**:
+  - Flags operational anomalies such as `NEGATIVE_MARGIN`, `ACTIVE_BACKORDER`, `OVERDUE_INVOICE`, `STALLED_APPROVAL`, `EXPIRED_QUOTATION`, and `FAILED_PAYMENT` with severity ratings and concrete suggested actions.
+- **Portfolio Intelligence (`/deal-health`)**:
+  - Executive KPI dashboard displaying Average Health, Healthy count, At-Risk count, Critical Alerts, and Total Portfolio Value.
+  - Searchable and level-filtered portfolio table with visual score gauges and primary risk indicators.
+- **Quotation Detail Integration (`/quotations/[id]`)**:
+  - Embedded `<DealHealthCard>` with real-time operational scorecard, factor breakdown, detected anomalies, and actionable next steps.
+- **Role-Based Security**:
+  - Strict customer exclusion (`403 Forbidden`).
+  - Sales representative isolation: reps can only inspect health intelligence for their own deals.
+- Full architecture and API specifications are **documented in [`docs/deal-health.md`](docs/deal-health.md)**.
+
+### Deal Health demo flow
+
+1. Log in as **Ravi Patel** (`ravi.patel@dealflow360.io`, Sales Manager) or **Avery Stone** (Admin).
+2. Browse to **Insights → Deal Health** (`/deal-health`) in the sidebar.
+3. Review portfolio KPIs and click on any deal or filter by `CRITICAL` / `AT_RISK`.
+4. Click **Inspect** to open the quotation detail page and view the full `<DealHealthCard>` breakdown.
+
 ## Phase 1 feature summary
 
 - Next.js 16 + TypeScript application, Tailwind CSS v4 and shadcn/ui.
@@ -228,7 +255,6 @@ Phase 7 implements customer-facing access and real-time structured quotation neg
   subscription plans.
 - Quotation engine (Phase 2), discount governance + approval workflow
   (Phase 3), AI-assisted recommendations (Phase 4), multi-warehouse fulfillment
-  and backorders (Phase 5) and hybrid billing (Phase 6).
-- Deal Health remains a placeholder for a later phase.
+  and backorders (Phase 5), hybrid billing (Phase 6), customer portal & negotiations (Phase 7), and deal health intelligence (Phase 8).
 - PostgreSQL data model seeded with realistic demo data (users, customers,
   products, discount tiers, warehouses, inventory, subscription plans).

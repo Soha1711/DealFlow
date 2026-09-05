@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, FileText, Mail, User } from "lucide-react";
+import { ArrowLeft, Clock, Mail, User } from "lucide-react";
 
 import { requireAreaAccess } from "@/lib/auth-guards";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -42,7 +42,7 @@ export default async function CustomerQuotationDetailPage({
 
   if (!customerId) notFound();
 
-  let quotation;
+  let quotation: Awaited<ReturnType<typeof getCustomerQuotation>>;
   try {
     quotation = await getCustomerQuotation(id, customerId);
   } catch {
@@ -50,7 +50,7 @@ export default async function CustomerQuotationDetailPage({
   }
 
   const lines = quotation.lines ?? [];
-  const negotiations = (quotation.negotiations as any[]) ?? [];
+  const negotiations = quotation.negotiations ?? [];
 
   return (
     <>
@@ -131,14 +131,14 @@ export default async function CustomerQuotationDetailPage({
                           {line.quantity}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {formatCurrency(line.unitPrice as number)}
+                          {formatCurrency(line.unitPrice)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {line.discountPercent > 0 ? (
                             <span className="text-red-700">
                               {line.discountPercent}%{" "}
                               <span className="text-muted-foreground">
-                                (−{formatCurrency(line.discountAmount as number)})
+                                (−{formatCurrency(line.discountAmount)})
                               </span>
                             </span>
                           ) : (
@@ -146,7 +146,7 @@ export default async function CustomerQuotationDetailPage({
                           )}
                         </TableCell>
                         <TableCell className="text-right font-medium tabular-nums">
-                          {formatCurrency(line.lineTotal as number)}
+                          {formatCurrency(line.lineTotal)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -174,20 +174,20 @@ export default async function CustomerQuotationDetailPage({
                 <div className="flex items-center justify-between">
                   <dt className="text-muted-foreground">Subtotal</dt>
                   <dd className="tabular-nums font-medium">
-                    {formatCurrency(quotation.subtotal as any)}
+                    {formatCurrency(Number(quotation.subtotal))}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between">
                   <dt className="text-muted-foreground">Discount Savings</dt>
                   <dd className="tabular-nums text-red-700 font-medium">
-                    −{formatCurrency(quotation.discountTotal as any)}
+                    −{formatCurrency(Number(quotation.discountTotal))}
                   </dd>
                 </div>
                 <Separator className="my-1" />
                 <div className="flex items-center justify-between text-base font-semibold">
                   <dt className="text-foreground">Total Proposal Value</dt>
                   <dd className="tabular-nums text-foreground">
-                    {formatCurrency(quotation.total as any)}
+                    {formatCurrency(Number(quotation.total))}
                   </dd>
                 </div>
               </dl>

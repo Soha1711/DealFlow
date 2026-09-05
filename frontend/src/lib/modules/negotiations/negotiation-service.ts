@@ -9,7 +9,6 @@ import {
   notFound,
 } from "./negotiation-errors";
 import {
-  canCustomerAccessQuotation,
   canSalesRepActOnNegotiation,
   sanitizeQuotationForCustomer,
 } from "./negotiation-guards";
@@ -116,8 +115,12 @@ export async function listCustomerQuotations(
   });
 
   const sanitizedData = data.map((q) => {
-    const { margin: _m, riskScore: _rs, riskLevel: _rl, requiredApprovalLevel: _al, ...rest } = q;
-    return rest;
+    const copy = { ...q };
+    delete (copy as { margin?: unknown }).margin;
+    delete (copy as { riskScore?: unknown }).riskScore;
+    delete (copy as { riskLevel?: unknown }).riskLevel;
+    delete (copy as { requiredApprovalLevel?: unknown }).requiredApprovalLevel;
+    return copy;
   });
 
   return {
@@ -239,6 +242,7 @@ export async function customerAcceptQuotation(
   customerId: string,
   _userId: string
 ) {
+  void _userId;
   return db.$transaction(async (tx) => {
     const quotation = await tx.quotation.findUnique({
       where: { id: quotationId },

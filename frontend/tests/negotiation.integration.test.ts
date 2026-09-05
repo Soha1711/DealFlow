@@ -167,14 +167,17 @@ describe("Phase 7: Customer Portal & Negotiation Integration", () => {
       async () => {
         await getCustomerQuotation(otherCustomerQuote.id, customer1Id);
       },
-      (err: any) => err instanceof NegotiationError && err.status === 404
+      (err: unknown) => err instanceof NegotiationError && err.status === 404
     );
   });
 
   it("retrieves sanitized quotation details with no cost or margin leakage", async () => {
     const quote = await createApprovedTestQuote(customer1Id);
 
-    const detail: any = await getCustomerQuotation(quote.id, customer1Id);
+    const detail = (await getCustomerQuotation(quote.id, customer1Id)) as Record<string, unknown> & {
+      id: string;
+      lines: Array<Record<string, unknown> & { quantity: number; product: Record<string, unknown> }>;
+    };
     assert.equal(detail.id, quote.id);
     assert.equal(detail.lines.length, 1);
     assert.equal(detail.lines[0].quantity, 2);
@@ -218,7 +221,7 @@ describe("Phase 7: Customer Portal & Negotiation Integration", () => {
           message: "Another request immediately",
         });
       },
-      (err: any) => err instanceof NegotiationError && err.status === 409
+      (err: unknown) => err instanceof NegotiationError && err.status === 409
     );
   });
 

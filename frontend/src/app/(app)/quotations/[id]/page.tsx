@@ -17,6 +17,8 @@ import { getBillingForQuotation } from "@/lib/modules/billing/billing-service";
 import { canManageBilling } from "@/lib/modules/billing/billing-guards";
 import { listNegotiationsForQuotation } from "@/lib/modules/negotiations/negotiation-service";
 import { canSalesRepActOnNegotiation } from "@/lib/modules/negotiations/negotiation-guards";
+import { getDealHealth } from "@/lib/modules/deal-health/deal-health-service";
+import { DealHealthCard } from "@/components/deal-health/deal-health-card";
 import { NegotiationPanel } from "@/components/quotations/negotiation-panel";
 import { ApprovalStageList, buildApprovalStages } from "@/components/approvals/approval-stage-list";
 import { RiskLevelBadge } from "@/components/approvals/risk-badge";
@@ -117,6 +119,11 @@ export default async function QuotationDetailPage({
     salesRepId: quotation.salesRepId,
     quotationStatus: quotation.status,
   });
+
+  const dealHealth = await getDealHealth(quotation.id, {
+    role: user.role,
+    userId: user.id,
+  }).catch(() => null);
 
   return (
     <>
@@ -264,6 +271,8 @@ export default async function QuotationDetailPage({
             canAct={canActNegotiation}
           />
         )}
+
+        {dealHealth && <DealHealthCard health={dealHealth} />}
       </div>
 
       <div className="flex flex-col gap-6">

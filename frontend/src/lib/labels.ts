@@ -229,3 +229,24 @@ export const NEGOTIATION_STATUS_BADGE_CLASSES: Record<NegotiationStatus, string>
   ACCEPTED: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
   REJECTED: "bg-red-50 text-red-700 hover:bg-red-50",
 };
+
+export type DealHealthLevel = "HEALTHY" | "AT_RISK" | "CRITICAL";
+
+export const DEAL_HEALTH_LEVEL_LABELS: Record<DealHealthLevel, string> = {
+  HEALTHY: "Healthy",
+  AT_RISK: "At Risk",
+  CRITICAL: "Critical",
+};
+
+export const DEAL_HEALTH_LEVEL_BADGE_CLASSES: Record<DealHealthLevel, string> = {
+  HEALTHY: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50",
+  AT_RISK: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50",
+  CRITICAL: "bg-red-50 text-red-700 border-red-200 hover:bg-red-50",
+};
+
+export const DEAL_HEALTH_SEVERITY_BADGE_CLASSES: Record<string, string> = {
+  LOW: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+  MEDIUM: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  HIGH: "bg-orange-50 text-orange-700 hover:bg-orange-50",
+  CRITICAL: "bg-red-50 text-red-700 hover:bg-red-50",
+};

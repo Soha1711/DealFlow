@@ -6,7 +6,6 @@ import {
   Check,
   CornerDownLeft,
   LoaderCircle,
-  MessageSquare,
   MessageSquareQuote,
   X,
 } from "lucide-react";
@@ -43,7 +42,7 @@ export function NegotiationPanel({
   quotationId: string;
   quotationStatus: string;
   negotiations: NegotiationRecord[];
-  lines: any[];
+  lines: Parameters<typeof AcceptNegotiationDialog>[0]["lines"];
   canAct: boolean;
 }) {
   const router = useRouter();
