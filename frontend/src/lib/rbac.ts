@@ -26,7 +26,7 @@ const AREA_ACCESS: Record<AppArea, Role[]> = {
   quotations: allowedRoles("ADMIN", "SALES_REP", "SALES_MANAGER"),
   approvals: allowedRoles("ADMIN", "SALES_MANAGER", "FINANCE"),
   fulfillment: allowedRoles("ADMIN", "OPERATIONS"),
-  billing: allowedRoles("ADMIN", "FINANCE"),
+  billing: allowedRoles("ADMIN", "FINANCE", "SALES_MANAGER", "SALES_REP"),
   "deal-health": allowedRoles("ADMIN", "SALES_MANAGER", "FINANCE", "OPERATIONS"),
   admin: allowedRoles("ADMIN"),
   "admin-products": allowedRoles("ADMIN"),

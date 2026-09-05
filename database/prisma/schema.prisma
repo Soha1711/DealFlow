@@ -103,6 +103,42 @@ enum InventoryReservationStatus {
   RELEASED
 }
 
+enum InvoiceType {
+  ONE_TIME
+  RECURRING
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  VOID
+  OVERDUE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  COMPLETED
+}
+
+enum BillingScheduleStatus {
+  SCHEDULED
+  DUE
+  PAID
+  FAILED
+  CANCELLED
+}
+
 // ---------------------------------------------------------------------------
 // Identity & access
 // ---------------------------------------------------------------------------
@@ -137,12 +173,27 @@ model Product {
   inventory          Inventory[]
   quotationLines     QuotationLine[]
   fulfillmentLines   FulfillmentLine[]
+  invoiceLines       InvoiceLine[]
+  subscriptions      Subscription[]
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
   @@index([category])
   @@index([isRecurring])
   @@map("products")
+}
+
+model SubscriptionPlan {
+  id              String          @id @default(cuid())
+  name            String          @unique
+  price           Decimal         @db.Decimal(12, 2)
+  billingInterval BillingInterval
+  products        Product[]
+  subscriptions   Subscription[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@map("subscription_plans")
 }
 
 model Warehouse {
@@ -173,18 +224,6 @@ model Inventory {
   @@map("inventory")
 }
 
-model SubscriptionPlan {
-  id              String          @id @default(cuid())
-  name            String          @unique
-  price           Decimal         @db.Decimal(12, 2)
-  billingInterval BillingInterval
-  products        Product[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  @@map("subscription_plans")
-}
-
 model Quotation {
   id                     String                @id @default(cuid())
   quotationNumber        String                @unique
@@ -205,6 +244,8 @@ model Quotation {
   lines                  QuotationLine[]
   approvals              Approval[]
   fulfillments           Fulfillment[]
+  invoices               Invoice[]
+  subscriptions          Subscription[]
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
 
@@ -291,13 +332,15 @@ model InventoryReservation {
 // ---------------------------------------------------------------------------
 
 model Customer {
-  id          String       @id @default(cuid())
-  name        String
-  email       String       @unique
-  tier        CustomerTier @default(STANDARD)
-  quotations  Quotation[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  tier          CustomerTier   @default(STANDARD)
+  quotations    Quotation[]
+  invoices      Invoice[]
+  subscriptions Subscription[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@map("customers")
 }
@@ -307,6 +350,136 @@ model Customer {
 // ---------------------------------------------------------------------------
 // These records are configuration only. The actual discount approval engine
 // is implemented in a later phase.
+
+// ---------------------------------------------------------------------------
+// Billing & subscriptions (Phase 6)
+// ---------------------------------------------------------------------------
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  customerId         String
+  quotationId        String
+  quotationLineId    String             @unique
+  productId          String
+  subscriptionPlanId String?
+  status             SubscriptionStatus @default(ACTIVE)
+  billingInterval    BillingInterval
+  recurringAmount    Decimal            @db.Decimal(12, 2)
+  startDate          DateTime
+  nextBillingDate    DateTime
+  cancelledAt        DateTime?
+  customer           Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  quotation          Quotation          @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+  quotationLine      QuotationLine      @relation(fields: [quotationLineId], references: [id], onDelete: Restrict)
+  product            Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  subscriptionPlan   SubscriptionPlan?  @relation(fields: [subscriptionPlanId], references: [id], onDelete: SetNull)
+  schedules          BillingSchedule[]
+  invoices           Invoice[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@index([nextBillingDate])
+  @@map("subscriptions")
+}
+
+model BillingSchedule {
+  id             String                @id @default(cuid())
+  subscriptionId String
+  periodStart    DateTime
+  periodEnd      DateTime
+  dueDate        DateTime
+  amount         Decimal               @default(0) @db.Decimal(12, 2)
+  status         BillingScheduleStatus @default(SCHEDULED)
+  invoiceId      String?               @unique
+  subscription   Subscription          @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  invoice        Invoice?              @relation("ScheduleInvoice", fields: [invoiceId], references: [id], onDelete: SetNull)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([subscriptionId, periodStart])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("billing_schedules")
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  invoiceNumber  String        @unique
+  type           InvoiceType   @default(ONE_TIME)
+  status         InvoiceStatus @default(DRAFT)
+  customerId     String
+  quotationId    String?
+  subscriptionId String?
+  subtotal       Decimal       @default(0) @db.Decimal(12, 2)
+  discountTotal  Decimal       @default(0) @db.Decimal(12, 2)
+  total          Decimal       @default(0) @db.Decimal(12, 2)
+  paidAmount     Decimal       @default(0) @db.Decimal(12, 2)
+  issueDate      DateTime?
+  dueDate        DateTime?
+  // Idempotency anchor: `ot:{quotationId}` for one-time invoices and
+  // `schedule:{scheduleId}` for a subscription period's invoice, so duplicate
+  // billing is impossible at the database level.
+  billingKey     String?       @unique
+  customer       Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  quotation      Quotation?    @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  schedule       BillingSchedule? @relation("ScheduleInvoice")
+  lines          InvoiceLine[]
+  payments       Payment[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([customerId])
+  @@index([quotationId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([type])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id             String   @id @default(cuid())
+  invoiceId      String
+  productId      String?
+  description    String
+  quantity       Int
+  unitPrice      Decimal  @db.Decimal(12, 2)
+  discountAmount Decimal  @default(0) @db.Decimal(12, 2)
+  lineTotal      Decimal  @default(0) @db.Decimal(12, 2)
+  isRecurring    Boolean  @default(false)
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  invoiceId       String
+  amount          Decimal       @db.Decimal(12, 2)
+  status          PaymentStatus @default(SUCCEEDED)
+  method          String?
+  reference       String?
+  // Webhook-ready: external providers send an event id; duplicate events are
+  // rejected by the unique constraint instead of double-crediting.
+  externalEventId String?       @unique
+  // Optional caller-supplied idempotency key for internal recording.
+  idempotencyKey  String?       @unique
+  paidAt          DateTime?
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([invoiceId])
+  @@index([status])
+  @@map("payments")
+}
 
 model DiscountTier {
   id            String                 @id @default(cuid())
@@ -340,20 +513,21 @@ model Approval {
 }
 
 model QuotationLine {
-  id              String    @id @default(cuid())
+  id              String        @id @default(cuid())
   quotationId     String
   productId       String
   quantity        Int
-  unitPrice       Decimal   @db.Decimal(12, 2)
-  discountPercent Int       @default(0)
-  discountAmount  Decimal   @default(0) @db.Decimal(12, 2)
-  lineTotal       Decimal   @default(0) @db.Decimal(12, 2)
-  margin          Decimal   @default(0) @db.Decimal(12, 2)
-  isRecurring     Boolean   @default(false)
-  quotation       Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
-  product         Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  unitPrice       Decimal       @db.Decimal(12, 2)
+  discountPercent Int           @default(0)
+  discountAmount  Decimal       @default(0) @db.Decimal(12, 2)
+  lineTotal       Decimal       @default(0) @db.Decimal(12, 2)
+  margin          Decimal       @default(0) @db.Decimal(12, 2)
+  isRecurring     Boolean       @default(false)
+  quotation       Quotation     @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  subscription    Subscription?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([quotationId])
   @@index([productId])

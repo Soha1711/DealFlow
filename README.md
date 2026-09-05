@@ -133,6 +133,65 @@ All demo accounts share the same password: **`DealFlow360!`**
 | Operations        | diego.ramos@dealflow360.io        |
 | Customer          | jordan.lee@dealflow360.io         |
 
+## Phase 6 — Hybrid billing & subscription billing
+
+Phase 6 turns billing into a real backend domain on top of the finalized
+quotation lifecycle. A quotation may contain **one-time lines**, **recurring
+(subscription) lines**, or **both** (hybrid):
+
+- One-time lines are billed through a `ONE_TIME` invoice that snapshots the
+  finalized amounts — later price/discount changes never alter a recorded
+  invoice.
+- Recurring lines create a `Subscription` (interval from its
+  `SubscriptionPlan`: monthly/quarterly/annual), a `BillingSchedule` per
+  billing period, and a `RECURRING` invoice per billed period.
+- Hybrid billing is atomic: `createBillingFromQuotation` creates the one-time
+  invoice, all subscriptions and their first-period schedules/invoices in one
+  Prisma transaction, guarded by a `pg_advisory_xact_lock` and DB unique keys
+  (`invoice.billingKey`, unique `Subscription.quotationLineId`, unique
+  `(subscriptionId, periodStart)`, unique payment `idempotencyKey`).
+
+**Billing is only possible for quotations that cleared governance**
+(APPROVED/CONFIRMED/FULFILLING/COMPLETED) — never DRAFT, rejected or
+still-pending ones. Only FINANCE and ADMIN may mutate billing; sales reps see
+read-only billing for their own quotations, managers see read-only across the
+business, OPERATIONS/CUSTOMER have no billing access. All authorization is
+enforced server-side.
+
+Full architecture (invoice/subscription/schedule state machines, idempotency
+strategy, payment model, RBAC, service layout, known limitations) is
+**documented in [`docs/billing.md`](docs/billing.md)**.
+
+### Seed demo scenarios
+
+`npm run db:seed` also creates Phase 6 demo data (only when the database has
+no invoices yet, so re-seeding never duplicates):
+
+- Approved **one-time**, **recurring** and **hybrid** quotations left unbilled
+  (Finance sees them in the *Ready to bill* list on `/billing`),
+- an **issued** one-time invoice,
+- an **active subscription** whose first-period recurring invoice is **paid**,
+  with the next period already generated (upcoming schedule),
+- a hybrid quotation billed and **partially paid**, with its own active
+  subscription.
+
+All demo artifacts are produced through the real domain services (quotation
+→ submit → billing → issue → payment), so state machines and Decimal pricing
+are authoritative.
+
+### Billing demo flow
+
+1. Log in as **Priya Nair** (Finance) and open `/billing`.
+2. Pick an approved quotation from the *Ready to bill* list and click
+   **Generate Billing** — a one-time invoice and/or subscription appears.
+3. Open the invoice and click **Issue** (`DRAFT → ISSUED`).
+4. Click **Record payment** for part of the total → `PARTIALLY_PAID`, then
+   record the remainder → `PAID`.
+5. Open the subscription under `/billing/subscriptions` to see its billing
+   history, then use **Bill next period** to generate the following cycle.
+
+See the docs for the exact invoice/subscription state machines.
+
 ## Phase 1 feature summary
 
 - Next.js 16 + TypeScript application, Tailwind CSS v4 and shadcn/ui.
@@ -142,7 +201,9 @@ All demo accounts share the same password: **`DealFlow360!`**
 - Authenticated app shell: sidebar, header, user menu, dashboards for each role.
 - Admin (read-only) views for products, customers, discount tiers, warehouses and
   subscription plans.
-- Placeholder routes for Quotations, Approvals, Fulfillment, Billing and Deal
-  Health — those modules are planned for later phases.
+- Quotation engine (Phase 2), discount governance + approval workflow
+  (Phase 3), AI-assisted recommendations (Phase 4), multi-warehouse fulfillment
+  and backorders (Phase 5) and hybrid billing (Phase 6).
+- Deal Health remains a placeholder for a later phase.
 - PostgreSQL data model seeded with realistic demo data (users, customers,
   products, discount tiers, warehouses, inventory, subscription plans).

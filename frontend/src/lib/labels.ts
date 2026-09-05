@@ -2,13 +2,18 @@ import type {
   ApprovalLevel,
   ApprovalStatus,
   BillingInterval,
+  BillingScheduleStatus,
   CustomerTier,
   DiscountApprovalLevel,
   DiscountRiskLevel,
   FulfillmentAllocationStatus,
   FulfillmentLineStatus,
   FulfillmentStatus,
+  InvoiceStatus,
+  InvoiceType,
+  PaymentStatus,
   QuotationStatus,
+  SubscriptionStatus,
 } from "@prisma/client";
 
 export const CUSTOMER_TIER_LABELS: Record<CustomerTier, string> = {
@@ -28,6 +33,73 @@ export const BILLING_INTERVAL_LABELS: Record<BillingInterval, string> = {
   MONTHLY: "Monthly",
   QUARTERLY: "Quarterly",
   ANNUAL: "Annual",
+};
+
+export const INVOICE_TYPE_LABELS: Record<InvoiceType, string> = {
+  ONE_TIME: "One-time",
+  RECURRING: "Recurring",
+};
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  DRAFT: "Draft",
+  ISSUED: "Issued",
+  PARTIALLY_PAID: "Partially paid",
+  PAID: "Paid",
+  VOID: "Void",
+  OVERDUE: "Overdue",
+};
+
+export const INVOICE_STATUS_BADGE_CLASSES: Record<InvoiceStatus, string> = {
+  DRAFT: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+  ISSUED: "bg-blue-50 text-blue-700 hover:bg-blue-50",
+  PARTIALLY_PAID: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  PAID: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  VOID: "bg-red-50 text-red-700 hover:bg-red-50",
+  OVERDUE: "bg-red-50 text-red-700 hover:bg-red-50",
+};
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  PENDING: "Pending",
+  SUCCEEDED: "Succeeded",
+  FAILED: "Failed",
+  REFUNDED: "Refunded",
+};
+
+export const PAYMENT_STATUS_BADGE_CLASSES: Record<PaymentStatus, string> = {
+  PENDING: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  SUCCEEDED: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  FAILED: "bg-red-50 text-red-700 hover:bg-red-50",
+  REFUNDED: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+};
+
+export const SUBSCRIPTION_STATUS_LABELS: Record<SubscriptionStatus, string> = {
+  ACTIVE: "Active",
+  PAUSED: "Paused",
+  CANCELLED: "Cancelled",
+  COMPLETED: "Completed",
+};
+
+export const SUBSCRIPTION_STATUS_BADGE_CLASSES: Record<SubscriptionStatus, string> = {
+  ACTIVE: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  PAUSED: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  CANCELLED: "bg-red-50 text-red-700 hover:bg-red-50",
+  COMPLETED: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+};
+
+export const BILLING_SCHEDULE_STATUS_LABELS: Record<BillingScheduleStatus, string> = {
+  SCHEDULED: "Scheduled",
+  DUE: "Due",
+  PAID: "Paid",
+  FAILED: "Failed",
+  CANCELLED: "Cancelled",
+};
+
+export const BILLING_SCHEDULE_STATUS_BADGE_CLASSES: Record<BillingScheduleStatus, string> = {
+  SCHEDULED: "bg-blue-50 text-blue-700 hover:bg-blue-50",
+  DUE: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  PAID: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  FAILED: "bg-red-50 text-red-700 hover:bg-red-50",
+  CANCELLED: "bg-red-50 text-red-700 hover:bg-red-50",
 };
 
 export const QUOTATION_STATUS_LABELS: Record<QuotationStatus, string> = {

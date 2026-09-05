@@ -1,14 +1,24 @@
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import {
   BillingInterval,
   CustomerTier,
   DiscountApprovalLevel,
-  Role,
 } from "@prisma/client";
 
+import { createQuotation, submitQuotation } from "../src/lib/modules/quotations/quotation-service";
+import { createBillingFromQuotation } from "../src/lib/modules/billing/billing-service";
+import { issueInvoice } from "../src/lib/modules/billing/invoice-service";
+import { recordPayment } from "../src/lib/modules/billing/payment-service";
+import { billSubscription } from "../src/lib/modules/billing/subscription-service";
+
 const prisma = new PrismaClient();
+
+/** Rounds a Decimal to 2dp (same rule as the billing engine). */
+function round2(value: Prisma.Decimal): Prisma.Decimal {
+  return value.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+}
 
 const DEMO_PASSWORD = "DealFlow360!";
 const PASSWORD_ROUNDS = 10;
@@ -345,6 +355,163 @@ async function main() {
       console.log(
         `  reservation: backfilled ${row.reservedQuantity} units for inventory ${row.id}`
       );
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Phase 6 demo: hybrid billing scenarios
+  // -----------------------------------------------------------------------
+  // Only created on a database that has no invoices yet (fresh setup / after a
+  // migrate reset). Re-running the seed after the app has been used leaves
+  // the demo billing data untouched, so quotation numbers and invoices are
+  // never duplicated. Every artifact is produced through the real domain
+  // services (createQuotation → submit → billing → issue → payments), so the
+  // state machines, pricing and Decimal arithmetic are authoritative.
+  const existingInvoices = await prisma.invoice.count();
+  if (existingInvoices > 0) {
+    console.log("  billing: demo scenarios skipped (invoices already exist)");
+  } else {
+    const mayaId = userByEmail["maya.chen@dealflow360.io"];
+    const priyaId = userByEmail["priya.nair@dealflow360.io"];
+    if (mayaId && priyaId) {
+      const salesRepActor = { userId: mayaId, role: Role.SALES_REP };
+      const financeActor = { userId: priyaId, role: Role.FINANCE };
+
+      const customerIdByEmail: Record<string, string> = {};
+      for (const c of seedCustomers) {
+        const customer = await prisma.customer.findUnique({
+          where: { email: c.email },
+          select: { id: true },
+        });
+        if (customer) customerIdByEmail[c.email] = customer.id;
+      }
+      const northwind = customerIdByEmail["billing@northwindtraders.com"];
+      const bluepeak = customerIdByEmail["procurement@bluepeakmfg.com"];
+      const helios = customerIdByEmail["finance@helioslogistics.com"];
+
+      const edge = productIdBySku["EDGE-DEV-021"];
+      const migration = productIdBySku["MIG-SVC-031"];
+      const crm = productIdBySku["CRM-ENT-001"];
+      const analytics = productIdBySku["ANL-PRO-002"];
+      const api = productIdBySku["API-ACC-011"];
+
+      // Helper: build a quotation and run it through submit. Discounts are
+      // kept within each product's limit so the deterministic risk check is
+      // LOW and the quotation is APPROVED without a manager/finance chain.
+      async function approvedQuote(
+        customerId: string,
+        label: string,
+        lines: { productId: string; quantity: number; unitPrice: number; discountPercent: number }[]
+      ) {
+        const quote = await createQuotation({
+          salesRepId: mayaId,
+          customerId,
+          lines,
+        });
+        await submitQuotation(quote.id, salesRepActor);
+        console.log(`  billing demo: ${label} → ${quote.quotationNumber} (APPROVED)`);
+        return quote;
+      }
+
+      // 1–3. One-time / recurring / hybrid quotations left APPROVED and
+      // unbilled — Finance sees these in the “ready to bill” pool.
+      if (northwind && edge) {
+        await approvedQuote(northwind, "one-time (Beacon Edge ×2)", [
+          { productId: edge, quantity: 2, unitPrice: 999, discountPercent: 5 },
+        ]);
+      }
+      if (bluepeak && crm) {
+        await approvedQuote(bluepeak, "recurring (CRM Enterprise ×1)", [
+          { productId: crm, quantity: 1, unitPrice: 240, discountPercent: 20 },
+        ]);
+      }
+      if (helios && edge && analytics) {
+        await approvedQuote(helios, "hybrid (Beacon Edge ×1 + Analytics Pro ×1)", [
+          { productId: edge, quantity: 1, unitPrice: 999, discountPercent: 5 },
+          { productId: analytics, quantity: 1, unitPrice: 120, discountPercent: 10 },
+        ]);
+      }
+
+      // 4. One-time quotation that is billed and issued (no payment yet).
+      if (northwind && migration) {
+        const q = await approvedQuote(northwind, "billed one-time (Data Migration ×1)", [
+          { productId: migration, quantity: 1, unitPrice: 8000, discountPercent: 10 },
+        ]);
+        const billing = await createBillingFromQuotation(q.id, financeActor);
+        if (billing.oneTimeInvoice) {
+          await issueInvoice(billing.oneTimeInvoice.id, financeActor);
+          console.log(
+            `  billing demo: invoice ${billing.oneTimeInvoice.invoiceNumber} ISSUED`
+          );
+        }
+      }
+
+      // 5. Recurring quotation fully billed and paid, then the next period is
+      // generated — an active subscription with billing history + upcoming
+      // schedule.
+      if (bluepeak && analytics) {
+        const q = await approvedQuote(bluepeak, "billed recurring (Analytics Pro ×1)", [
+          { productId: analytics, quantity: 1, unitPrice: 120, discountPercent: 10 },
+        ]);
+        const billing = await createBillingFromQuotation(q.id, financeActor);
+        const subscription = billing.subscriptions[0];
+        if (subscription) {
+          const firstInvoice = subscription.schedules[0]?.invoice;
+          if (firstInvoice) {
+            await issueInvoice(firstInvoice.id, financeActor);
+            const full = await prisma.invoice.findUniqueOrThrow({
+              where: { id: firstInvoice.id },
+              select: { total: true },
+            });
+            await recordPayment(firstInvoice.id, financeActor, {
+              amount: full.total.toString(),
+              method: "BANK_TRANSFER",
+              reference: `Seed payment for ${firstInvoice.invoiceNumber}`,
+            });
+            console.log(
+              `  billing demo: recurring invoice ${firstInvoice.invoiceNumber} PAID`
+            );
+          }
+          // Generate the next billing period so the subscription shows an
+          // upcoming (DRAFT invoice / DUE schedule) cycle.
+          const next = await billSubscription(subscription.id, financeActor);
+          console.log(
+            `  billing demo: subscription ${subscription.id} — next period scheduled (invoice ${next.invoiceId})`
+          );
+        }
+      }
+
+      // 6. Hybrid quotation billed and partially paid on the one-time
+      // invoice; the recurring line becomes an active subscription.
+      if (helios && edge && api) {
+        const q = await approvedQuote(helios, "billed hybrid (Beacon Edge ×2 + API Access ×1)", [
+          { productId: edge, quantity: 2, unitPrice: 999, discountPercent: 5 },
+          { productId: api, quantity: 1, unitPrice: 650, discountPercent: 10 },
+        ]);
+        const billing = await createBillingFromQuotation(q.id, financeActor);
+        if (billing.oneTimeInvoice) {
+          await issueInvoice(billing.oneTimeInvoice.id, financeActor);
+          const total = await prisma.invoice.findUniqueOrThrow({
+            where: { id: billing.oneTimeInvoice.id },
+            select: { total: true },
+          });
+          // Record ~40% so the invoice is PARTIALLY_PAID.
+          const partial = round2(new Prisma.Decimal(total.total.toString()).times("0.4"));
+          await recordPayment(billing.oneTimeInvoice.id, financeActor, {
+            amount: partial.toString(),
+            method: "BANK_TRANSFER",
+            reference: `Seed partial payment for ${billing.oneTimeInvoice.invoiceNumber}`,
+          });
+          console.log(
+            `  billing demo: invoice ${billing.oneTimeInvoice.invoiceNumber} PARTIALLY_PAID`
+          );
+        }
+        if (billing.subscriptions.length > 0) {
+          console.log(
+            `  billing demo: hybrid subscription created (${billing.subscriptions[0].id})`
+          );
+        }
+      }
     }
   }
 

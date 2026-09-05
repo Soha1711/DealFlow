@@ -13,6 +13,8 @@ import {
 import { getQuotation } from "@/lib/modules/quotations/quotation-service";
 import { listApprovalsForQuotation } from "@/lib/modules/approvals/approval-service";
 import { getFulfillmentForQuotation } from "@/lib/modules/fulfillment/fulfillment-service";
+import { getBillingForQuotation } from "@/lib/modules/billing/billing-service";
+import { canManageBilling } from "@/lib/modules/billing/billing-guards";
 import { ApprovalStageList, buildApprovalStages } from "@/components/approvals/approval-stage-list";
 import { RiskLevelBadge } from "@/components/approvals/risk-badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,9 @@ import { QuotationStatusBadge } from "@/components/quotations/status-badge";
 import { SubmitQuotationButton } from "@/components/quotations/submit-quotation-button";
 import { FulfillmentStatusBadge } from "@/components/fulfillment/fulfillment-status-badge";
 import { StartFulfillmentButton } from "@/components/fulfillment/start-fulfillment-button";
+import { GenerateBillingButton } from "@/components/billing/generate-billing-button";
+import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge";
+import { SubscriptionStatusBadge } from "@/components/billing/subscription-status-badge";
 
 export const metadata: Metadata = { title: "Quotation" };
 
@@ -88,6 +93,19 @@ export default async function QuotationDetailPage({
     role: user.role,
     userId: user.id,
   }).catch(() => null);
+
+  const billing = await getBillingForQuotation(quotation.id, {
+    role: user.role,
+    userId: user.id,
+  }).catch(() => ({ invoices: [], subscriptions: [] }));
+  const canBill = canManageBilling(user.role);
+  const billableNow =
+    quotation.status === "APPROVED" ||
+    quotation.status === "CONFIRMED" ||
+    quotation.status === "FULFILLING" ||
+    quotation.status === "COMPLETED";
+  const hasBilling =
+    billing.invoices.length > 0 || billing.subscriptions.length > 0;
 
   return (
     <>
@@ -322,6 +340,91 @@ export default async function QuotationDetailPage({
               </CardContent>
             </Card>
           ) : null}
+
+          {hasBilling && (
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Billing</CardTitle>
+                <CardDescription>
+                  Invoices and subscriptions generated from this quotation.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-3">
+                  {billing.invoices.map((invoice) => (
+                    <div
+                      key={invoice.id}
+                      className="flex items-center justify-between gap-3 text-sm"
+                    >
+                      <div className="flex min-w-0 flex-col">
+                        <Button
+                          asChild
+                          variant="link"
+                          className="h-auto justify-start p-0 text-blue-700"
+                        >
+                          <Link href={`/billing/invoices/${invoice.id}`}>
+                            {invoice.invoiceNumber}
+                            <ArrowUpRight className="size-3.5" aria-hidden />
+                          </Link>
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          {invoice.type === "ONE_TIME"
+                            ? "One-time"
+                            : "Recurring"}
+                          {" · "}
+                          {formatCurrency(invoice.total)}
+                        </span>
+                      </div>
+                      <InvoiceStatusBadge status={invoice.status} />
+                    </div>
+                  ))}
+                  {billing.subscriptions.map((subscription) => (
+                    <div
+                      key={subscription.id}
+                      className="flex items-center justify-between gap-3 text-sm"
+                    >
+                      <div className="flex min-w-0 flex-col">
+                        <Button
+                          asChild
+                          variant="link"
+                          className="h-auto justify-start p-0 text-blue-700"
+                        >
+                          <Link
+                            href={`/billing/subscriptions/${subscription.id}`}
+                          >
+                            {subscription.product.name}
+                            <ArrowUpRight className="size-3.5" aria-hidden />
+                          </Link>
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          {formatCurrency(subscription.recurringAmount)}
+                          {" · "}
+                          {subscription.subscriptionPlan?.billingInterval ??
+                            "subscription"}
+                        </span>
+                      </div>
+                      <SubscriptionStatusBadge status={subscription.status} />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {!hasBilling && canBill && billableNow && (
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Billing</CardTitle>
+                <CardDescription>
+                  Generate one-time invoices and subscriptions from this
+                  finalized quotation.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <GenerateBillingButton quotationId={quotation.id} />
+              </CardContent>
+            </Card>
+          )}
 
           {(quotation.riskScore !== null || quotation.riskLevel !== null) && (
             <Card className="bg-white">
