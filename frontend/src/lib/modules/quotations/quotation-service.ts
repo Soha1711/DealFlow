@@ -1,5 +1,3 @@
-import "server-only";
-
 import type { Prisma, Role } from "@prisma/client";
 
 import { db } from "@/lib/db";
@@ -270,6 +268,94 @@ export async function updateDraftQuotation(
           : {}),
         ...(pricedLines ? totals : {}),
       },
+      include: quotationInclude,
+    });
+  });
+}
+
+export type AddQuotationLineInput = {
+  productId: string;
+  quantity: number;
+  unitPrice?: QuotationLineInput["unitPrice"];
+  discountPercent?: number;
+};
+
+/**
+ * Adds a single line to a DRAFT quotation owned by the caller. The new line
+ * is priced together with the existing lines by the Phase 2 pricing engine in
+ * one transaction, so totals are always authoritative. Discount/approval
+ * governance is untouched: the quotation remains a DRAFT, and Phase 3 risk
+ * scoring runs at the next submission.
+ */
+export async function addQuotationLineToDraft(
+  id: string,
+  context: OwnedContext,
+  input: AddQuotationLineInput
+) {
+  const existing = await db.quotation.findUnique({
+    where: { id },
+    select: { id: true, status: true, salesRepId: true },
+  });
+  if (!existing) {
+    throw notFound("Quotation not found.");
+  }
+  assertEditable(existing, context, "edited");
+
+  return db.$transaction(async (tx) => {
+    const product = await tx.product.findUnique({
+      where: { id: input.productId },
+    });
+    if (!product) {
+      throw badRequest("Unknown product.", "UNKNOWN_PRODUCT");
+    }
+
+    const currentLines = await tx.quotationLine.findMany({
+      where: { quotationId: id },
+      orderBy: { createdAt: "asc" },
+      select: {
+        productId: true,
+        quantity: true,
+        unitPrice: true,
+        discountPercent: true,
+      },
+    });
+
+    const merged: QuotationLineInput[] = [
+      ...currentLines.map((line) => ({
+        productId: line.productId,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice.toString(),
+        discountPercent: line.discountPercent,
+      })),
+      {
+        productId: input.productId,
+        quantity: input.quantity,
+        unitPrice: input.unitPrice ?? product.price.toString(),
+        discountPercent: input.discountPercent ?? 0,
+      },
+    ];
+
+    const pricedLines = await priceLines(tx, merged);
+    const totals = calculateQuotationTotals(pricedLines);
+
+    await tx.quotationLine.deleteMany({ where: { quotationId: id } });
+    await tx.quotationLine.createMany({
+      data: pricedLines.map((line) => ({
+        quotationId: id,
+        productId: line.productId,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        discountPercent: line.discountPercent,
+        discountAmount: line.discountAmount,
+        lineTotal: line.lineTotal,
+        margin: line.margin,
+        isRecurring: line.isRecurring,
+      })),
+    });
+
+    return tx.quotation.update({
+      where: { id },
+      data: totals,
       include: quotationInclude,
     });
   });

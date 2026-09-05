@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { InfoBanner } from "@/components/layout/info-banner";
 import { PageHeader } from "@/components/layout/page-header";
+import { RecommendationsPanel } from "@/components/recommendations/recommendations-panel";
 import { QuotationStatusBadge } from "@/components/quotations/status-badge";
 import { SubmitQuotationButton } from "@/components/quotations/submit-quotation-button";
 
@@ -122,6 +123,15 @@ export default async function QuotationDetailPage({
           <InfoBanner
             title="Approved"
             description="Discounts are within product limits — no approval was required."
+          />
+        </div>
+      )}
+
+      {quotation.status === "DRAFT" && (
+        <div className="mb-6">
+          <RecommendationsPanel
+            quotationId={quotation.id}
+            canAdd={editable}
           />
         </div>
       )}

@@ -60,6 +60,23 @@ export type UpdateQuotationInput = z.infer<typeof updateQuotationSchema>;
 
 export const quotationIdSchema = z.string().min(1, "Quotation id is required");
 
+/** Add-a-line payload (used by the recommendation → Add to Quote workflow). */
+export const addQuotationLineSchema = z.object({
+  productId: z.string().min(1, "productId is required"),
+  quantity: z
+    .number({ message: "quantity must be a number" })
+    .int("quantity must be a whole number")
+    .positive("quantity must be greater than 0"),
+  unitPrice: moneyInputSchema.optional(),
+  discountPercent: z
+    .number({ message: "discountPercent must be a number" })
+    .min(0, "discountPercent must be between 0 and 100")
+    .max(100, "discountPercent must be between 0 and 100")
+    .optional(),
+});
+
+export type AddQuotationLineInput = z.infer<typeof addQuotationLineSchema>;
+
 /** Server-side list query params (page, pageSize, search, status). */
 export const listQuotationsQuerySchema = z.object({
   page: z.coerce.number().int("page must be an integer").min(1, "page must be at least 1").default(1),
