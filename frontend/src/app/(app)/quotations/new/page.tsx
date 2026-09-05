@@ -25,6 +25,8 @@ export default async function NewQuotationPage() {
       <PageHeader
         title="New quotation"
         description="Build a quotation with product lines, discounts and proposal totals."
+        backHref="/quotations"
+        backLabel="Back to quotations"
       />
       <QuotationForm
         mode="create"

@@ -42,10 +42,12 @@ export default async function AdminWarehousesPage() {
       <PageHeader
         title="Warehouses"
         description="Fulfillment locations and their current inventory levels."
+        backHref="/admin"
+        backLabel="Back to administration"
       />
       <div className="mb-6">
         <InfoBanner
-          title="Inventory adjustments (Phase 5)"
+          title="Inventory adjustments"
           description="Adjust stock levels to replenish inventory and release backorders. Adjustments are transactional and guarded against negative stock."
         />
       </div>

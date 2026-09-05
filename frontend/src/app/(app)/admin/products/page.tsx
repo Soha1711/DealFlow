@@ -5,7 +5,6 @@ import { listProducts } from "@/lib/modules/products/products-service";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
-import { InfoBanner } from "@/components/layout/info-banner";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -27,13 +26,9 @@ export default async function AdminProductsPage() {
       <PageHeader
         title="Products"
         description="Catalog, pricing, cost and per-product discount ceilings."
+        backHref="/admin"
+        backLabel="Back to administration"
       />
-      <div className="mb-6">
-        <InfoBanner
-          title="Read-only in Phase 1"
-          description="Product management (create, edit, retire) is implemented in a later phase."
-        />
-      </div>
 
       {products.length === 0 ? (
         <EmptyState description="No products have been seeded yet." />

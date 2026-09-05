@@ -18,7 +18,7 @@ export function Sidebar({ user }: { user: CurrentUser }) {
       <div className="px-4 py-4">
         <Separator className="mb-4" />
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          DealFlow360 · Phase 1 foundation
+          DealFlow360 · Enterprise Platform
         </p>
       </div>
     </aside>

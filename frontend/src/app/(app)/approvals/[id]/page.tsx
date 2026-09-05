@@ -74,6 +74,8 @@ export default async function ApprovalDetailPage({
       <PageHeader
         title={quotation.quotationNumber}
         description={`Approval created ${formatDate(approval.createdAt)}`}
+        backHref="/approvals"
+        backLabel="Back to approvals"
       >
         <QuotationStatusBadge status={quotation.status} />
         <ApprovalStatusBadge status={approval.status} />

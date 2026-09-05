@@ -54,6 +54,8 @@ export default async function EditQuotationPage({
       <PageHeader
         title={`Edit ${quotation.quotationNumber}`}
         description="Update the draft and save, or submit it for approval."
+        backHref={`/quotations/${quotation.id}`}
+        backLabel="Back to quotation"
       />
       <QuotationForm
         mode="edit"

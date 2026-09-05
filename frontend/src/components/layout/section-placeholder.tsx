@@ -28,13 +28,12 @@ export function SectionPlaceholder({
           </span>
           <CardTitle className="text-base">Coming soon</CardTitle>
           <CardDescription className="max-w-md">
-            This module is part of the DealFlow360 roadmap and will be built in a
-            later phase. No functionality is stubbed out here.
+            This module is part of the DealFlow360 platform and is currently being configured.
           </CardDescription>
         </CardHeader>
         <CardContent className="pb-5 text-center">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
-            {plannedIn ? `Planned for ${plannedIn}` : "Roadmap item"}
+            {plannedIn ? plannedIn : "Upcoming"}
           </span>
         </CardContent>
       </Card>

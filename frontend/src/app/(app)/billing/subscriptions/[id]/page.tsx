@@ -57,6 +57,8 @@ export default async function SubscriptionDetailPage({
       <PageHeader
         title={subscription.product.name}
         description={`Subscription · ${subscription.quotation.quotationNumber}`}
+        backHref="/billing/subscriptions"
+        backLabel="Back to subscriptions"
       >
         <SubscriptionStatusBadge status={subscription.status} />
       </PageHeader>

@@ -57,6 +57,8 @@ export default async function FulfillmentDetailPage({
       <PageHeader
         title={quotation.quotationNumber}
         description={`Fulfillment created ${formatDate(fulfillment.createdAt)}`}
+        backHref="/fulfillment"
+        backLabel="Back to fulfillment"
       >
         <FulfillmentStatusBadge status={fulfillment.status} />
         <QuotationStatusBadge status={quotation.status} />

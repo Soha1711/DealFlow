@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, Mail, User } from "lucide-react";
+import { Clock, Mail, User } from "lucide-react";
 
 import { requireAreaAccess } from "@/lib/auth-guards";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -88,19 +87,11 @@ export default async function CustomerQuotationDetailPage({
 
   return (
     <>
-      <div className="mb-4">
-        <Link
-          href="/portal"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" aria-hidden />
-          Back to all quotations
-        </Link>
-      </div>
-
       <PageHeader
         title={quotation.quotationNumber}
         description={`Issued to ${quotation.customer?.name} on ${formatDate(quotation.createdAt)}`}
+        backHref="/portal"
+        backLabel="Back to all quotations"
       >
         <div className="flex items-center gap-3">
           <QuotationStatusBadge status={quotation.status} />

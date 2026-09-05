@@ -60,6 +60,8 @@ export default async function InvoiceDetailPage({
       <PageHeader
         title={invoice.invoiceNumber}
         description={`${INVOICE_TYPE_LABELS[invoice.type]} · Created ${formatDate(invoice.createdAt)}`}
+        backHref="/billing"
+        backLabel="Back to invoices"
       >
         <InvoiceStatusBadge status={invoice.status} />
       </PageHeader>

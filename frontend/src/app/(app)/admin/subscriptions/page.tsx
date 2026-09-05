@@ -6,7 +6,6 @@ import { BILLING_INTERVAL_LABELS } from "@/lib/labels";
 import { formatCurrency } from "@/lib/format";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
-import { InfoBanner } from "@/components/layout/info-banner";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -28,13 +27,9 @@ export default async function AdminSubscriptionsPage() {
       <PageHeader
         title="Subscription Plans"
         description="Recurring price points that subscription-capable products can attach to."
+        backHref="/admin"
+        backLabel="Back to administration"
       />
-      <div className="mb-6">
-        <InfoBanner
-          title="Read-only in Phase 1"
-          description="Subscription billing and lifecycle management is implemented in a later phase."
-        />
-      </div>
 
       {plans.length === 0 ? (
         <EmptyState description="No subscription plans have been seeded yet." />

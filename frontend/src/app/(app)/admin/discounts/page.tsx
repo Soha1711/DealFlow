@@ -5,7 +5,6 @@ import { listDiscountTiers } from "@/lib/modules/catalog/catalog-service";
 import { APPROVAL_LEVEL_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
-import { InfoBanner } from "@/components/layout/info-banner";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -35,13 +34,9 @@ export default async function AdminDiscountsPage() {
       <PageHeader
         title="Discount Rules"
         description="Discount governance tiers and the approval level required to grant them."
+        backHref="/admin"
+        backLabel="Back to administration"
       />
-      <div className="mb-6">
-        <InfoBanner
-          title="Configuration only"
-          description="These tiers drive the discount approval engine, which ships in a later phase."
-        />
-      </div>
 
       {tiers.length === 0 ? (
         <EmptyState description="No discount tiers have been seeded yet." />

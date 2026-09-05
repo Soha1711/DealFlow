@@ -6,7 +6,6 @@ import { CUSTOMER_TIER_LABELS } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
-import { InfoBanner } from "@/components/layout/info-banner";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -35,13 +34,9 @@ export default async function AdminCustomersPage() {
       <PageHeader
         title="Customers"
         description="B2B accounts, tiering and relationship data from the CRM foundation."
+        backHref="/admin"
+        backLabel="Back to administration"
       />
-      <div className="mb-6">
-        <InfoBanner
-          title="Read-only in Phase 1"
-          description="Customer relationship management (create, edit, tier changes) is implemented in a later phase."
-        />
-      </div>
 
       {customers.length === 0 ? (
         <EmptyState description="No customers have been seeded yet." />

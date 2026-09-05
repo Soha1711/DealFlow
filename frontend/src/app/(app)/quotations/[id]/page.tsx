@@ -130,6 +130,8 @@ export default async function QuotationDetailPage({
       <PageHeader
         title={quotation.quotationNumber}
         description={`Created ${formatDate(quotation.createdAt)}`}
+        backHref="/quotations"
+        backLabel="Back to quotations"
       >
         <QuotationStatusBadge status={quotation.status} />
         <Button asChild variant="outline" className="gap-1.5">
