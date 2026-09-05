@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     const body = await request.json().catch(() => null);
     if (!body) {
-      return errorResponse(422, "Request body is required.", "BAD_REQUEST");
+      return errorResponse(400, "Request body is required.", "BAD_REQUEST");
     }
     const parsed = recordPaymentSchema.safeParse(body);
     if (!parsed.success) {

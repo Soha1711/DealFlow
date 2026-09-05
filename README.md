@@ -1,25 +1,17 @@
 # DealFlow360
 
-Intelligent sales operations platform for the modern B2B team — quotations, discount
-governance, fulfillment, billing and deal health.
+Intelligent sales-to-cash operations platform for the modern B2B team — dynamic quotation pricing, tiered discount risk governance, AI upsell/cross-sell recommendations, multi-warehouse fulfillment, hybrid subscription billing, customer negotiation portal, and real-time deal health intelligence.
 
-**Phase 1** ships the foundation: Next.js + TypeScript application shell, Auth.js
-authentication, role-based access control (RBAC), and the PostgreSQL + Prisma data
-layer (users, customers, products, discount tiers, warehouses, inventory and
-subscription plans). Future module functionality (quotation engine, approval
-workflow, warehouse allocation, billing, deal health, etc.) is intentionally not
-implemented yet and is represented by placeholder routes.
+DealFlow360 integrates the entire enterprise commercial lifecycle into an authoritative, deterministic, and role-governed web application.
 
 ## Repository layout
 
-| Path           | Purpose                                                        |
-| -------------- | -------------------------------------------------------------- |
-| `frontend/`    | Next.js 16 + TypeScript web application (all app code)         |
-| `backend/`     | Reserved for the future API service (not implemented)          |
-| `ai/`          | Reserved for future AI/recommendation services (not implemented) |
-| `database/`    | Prisma schema and migrations (`database/prisma/`)              |
-| `tests/`       | Reserved for future automated tests (not implemented)          |
-| `docs/`        | Reserved for project documentation                             |
+| Path           | Purpose                                                                 |
+| -------------- | ----------------------------------------------------------------------- |
+| `frontend/`    | Next.js 16 + TypeScript web application (full stack UI, API routes, and domain modules) |
+| `frontend/tests/` | Comprehensive test suite (31 suites, 393 tests covering all domains and E2E lifecycle) |
+| `database/`    | PostgreSQL Prisma schema and versioned migrations (`database/prisma/`)   |
+| `docs/`        | Architectural and domain specifications (`deal-health.md`, `billing.md`, etc.) |
 
 ## Prerequisites
 
@@ -244,17 +236,73 @@ Phase 8 introduces a deterministic, real-time operational deal risk evaluation e
 3. Review portfolio KPIs and click on any deal or filter by `CRITICAL` / `AT_RISK`.
 4. Click **Inspect** to open the quotation detail page and view the full `<DealHealthCard>` breakdown.
 
-## Phase 1 feature summary
+## Phase 9 — System Hardening, Cross-Module Integration & Polish
 
-- Next.js 16 + TypeScript application, Tailwind CSS v4 and shadcn/ui.
-- Auth.js (credentials) login with session-based protected routes.
-- Six roles (`ADMIN`, `SALES_REP`, `SALES_MANAGER`, `FINANCE`, `OPERATIONS`,
-  `CUSTOMER`) with server-side area authorization and role-aware navigation.
-- Authenticated app shell: sidebar, header, user menu, dashboards for each role.
-- Admin (read-only) views for products, customers, discount tiers, warehouses and
-  subscription plans.
-- Quotation engine (Phase 2), discount governance + approval workflow
-  (Phase 3), AI-assisted recommendations (Phase 4), multi-warehouse fulfillment
-  and backorders (Phase 5), hybrid billing (Phase 6), customer portal & negotiations (Phase 7), and deal health intelligence (Phase 8).
-- PostgreSQL data model seeded with realistic demo data (users, customers,
-  products, discount tiers, warehouses, inventory, subscription plans).
+Phase 9 cements DealFlow360 into a unified, production-ready enterprise platform:
+
+- **End-to-End Enterprise Integration**:
+  - Seamless state progression across all 8 modules: Quotation (`DRAFT`) → Submission & Discount Risk → Tiered Approvals (`MANAGER` / `FINANCE`) → Customer Negotiation Portal → Rep Counter/Accept with Automatic Re-evaluation → Multi-Warehouse Fulfillment & Stock Reservation → Hybrid Invoicing & Payments → 0–100 Real-Time Deal Health Intelligence.
+  - Integration alignment: operations may initiate fulfillment on both `APPROVED` and customer-`CONFIRMED` quotations; customer-confirmed quotations automatically appear in the operations fulfillment queue.
+- **Turnkey Multi-Persona Demo Environment**:
+  - `npm run db:seed` provisions realistic scenarios for every role:
+    - **Maya Chen (Sales Rep)**: Active DRAFT quotation ready to demo AI upsell/cross-sell recommendations.
+    - **Ravi Patel (Sales Manager)**: Pending discount approval in `/approvals`.
+    - **Priya Nair (Finance)**: Escalated multi-tier discount approval in `/approvals` and ready-to-bill quotations in `/billing`.
+    - **Diego Ramos (Operations)**: In-flight fulfillment with multi-warehouse split and backorders in `/fulfillment`.
+    - **Jordan Lee (Customer)**: Quotation under active structured negotiation in `/portal`.
+    - **Avery Stone (Admin)**: Full portfolio overview and deal health spectrum (`HEALTHY`, `AT_RISK`, `CRITICAL`) on `/deal-health`.
+- **Automated Verification**:
+  - **393 passing tests** across 99 suites, including `tests/end-to-end-integration.test.ts` asserting the full continuous lifecycle.
+  - Zero TypeScript errors (`tsc --noEmit`), zero ESLint errors, and clean Turbopack production builds.
+
+---
+
+## 5-Minute Hackathon Demo Walkthrough
+
+All accounts use the password: **`DealFlow360!`**
+
+### Step 1: Maya Chen (Sales Rep) — AI Recommendations & Proposal Submission
+1. Log in as `maya.chen@dealflow360.io`.
+2. Navigate to **Quotations** (`/quotations`) and open the seeded `DRAFT` quote.
+3. Observe the **Recommendations Panel**: view upsell & cross-sell candidates scored by stock availability and margin. Click **Add to Quote** to dynamically update lines.
+4. Click **Submit for Approval**: the deterministic discount-risk engine evaluates product-level thresholds and flags managerial review.
+
+### Step 2: Ravi Patel (Sales Manager) — Discount Governance
+1. Log in as `ravi.patel@dealflow360.io`.
+2. Navigate to **Approvals** (`/approvals`): view pending approval with risk level, score, and line overage details.
+3. Click **Approve**: proposal is authorized and transitions to `APPROVED`.
+
+### Step 3: Jordan Lee (Customer) — Customer Portal & Negotiation
+1. Log in as `jordan.lee@dealflow360.io`.
+2. Browse to **Customer Portal** (`/portal`): see only Northwind Traders' quotations (strict IDOR protection; zero internal cost/margin exposure).
+3. Open the quotation under negotiation or submit a new volume request with target pricing.
+
+### Step 4: Diego Ramos (Operations) — Multi-Warehouse Fulfillment & Backorders
+1. Log in as `diego.ramos@dealflow360.io`.
+2. Navigate to **Fulfillment** (`/fulfillment`): view approved & customer-confirmed quotations awaiting fulfillment.
+3. Open an order and view warehouse inventory allocation across Cincinnati and Reno. Notice automated backorder handling when requested quantity exceeds available stock.
+
+### Step 5: Priya Nair (Finance) — Hybrid Invoicing & Cash Collection
+1. Log in as `priya.nair@dealflow360.io`.
+2. Navigate to **Billing** (`/billing`): select an approved/confirmed deal and click **Generate Billing**.
+3. Open the generated invoice, click **Issue**, and record payment (`PARTIALLY_PAID` → `PAID`).
+4. For recurring contracts, view the active subscription and billing schedule under **Subscriptions**.
+
+### Step 6: Avery Stone (Admin) — Deal Health & Executive Intelligence
+1. Log in as `avery.stone@dealflow360.io`.
+2. Navigate to **Deal Health** (`/deal-health`): view portfolio KPIs, health distribution (`HEALTHY`, `AT_RISK`, `CRITICAL`), and real operational anomalies.
+3. Inspect any deal to view the `<DealHealthCard>` with granular scoring factors and suggested next steps.
+
+---
+
+## Complete Feature Matrix (Phases 1–9)
+
+- **Application Shell & RBAC**: Next.js 16 + TypeScript, Tailwind CSS v4, shadcn/ui, Auth.js credentials, and role-based route protection for 6 distinct personas.
+- **Quotation Engine**: Strict Decimal arithmetic, multi-line pricing, year-sequenced quotation numbering (`QUOT-YYYY-XXXX`), and full draft editing.
+- **Discount Governance**: Product-level threshold validation, deterministic discount-risk scoring (0–100), and multi-stage managerial/finance escalation state machines.
+- **AI Upsell/Cross-sell Intelligence**: Inventory-aware, margin-aware, and purchase-history-aware recommendation ranking with graceful fallback.
+- **Multi-Warehouse Fulfillment**: Deterministic greedy allocation across warehouses, row-level transactional reservation ledgers (`pg_advisory_xact_lock`), and automated backordering.
+- **Hybrid Billing**: Unified generation of one-time invoices and recurring subscriptions, period billing schedules, and idempotent payment recording.
+- **Customer Portal & Structured Negotiations**: Scoped customer portal, information hiding (zero cost/margin leakage), and bi-directional counter-negotiation workflows.
+- **Deal Health Intelligence**: Pure deterministic deal health scoring (0–100), health tier classification, and automated operational anomaly detection.
+- **Hardened & Tested**: 393 tests passing across 99 suites, zero typecheck/lint warnings, clean production builds, and turnkey seed data.

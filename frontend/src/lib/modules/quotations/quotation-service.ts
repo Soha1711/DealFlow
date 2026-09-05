@@ -1,4 +1,4 @@
-import type { Prisma, Role } from "@prisma/client";
+import type { Prisma, QuotationStatus, Role } from "@prisma/client";
 
 import { db } from "@/lib/db";
 import { routeSubmittedQuotation } from "@/lib/modules/approvals/approval-service";
@@ -157,7 +157,7 @@ export type ListQuotationsParams = {
   page: number;
   pageSize: number;
   search?: string;
-  status?: "DRAFT" | "PENDING_APPROVAL" | "PENDING_MANAGER" | "PENDING_FINANCE" | "APPROVED" | "REJECTED";
+  status?: QuotationStatus;
 };
 
 export async function listQuotations(params: ListQuotationsParams) {

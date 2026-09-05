@@ -346,9 +346,9 @@ export async function createFulfillment(
     if (!quotation) {
       throw notFound("Quotation not found.");
     }
-    if (quotation.status !== "APPROVED") {
+    if (quotation.status !== "APPROVED" && quotation.status !== "CONFIRMED") {
       throw conflict(
-        "Fulfillment may only begin for APPROVED quotations.",
+        "Fulfillment may only begin for APPROVED or CONFIRMED quotations.",
         "QUOTATION_NOT_APPROVED"
       );
     }

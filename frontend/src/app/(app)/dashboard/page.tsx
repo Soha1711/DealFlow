@@ -28,29 +28,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-const futureModules = [
-  {
-    title: "Quotation pipeline",
-    description: "Quotation creation, line items and proposal lifecycle.",
-    icon: FileText,
-  },
-  {
-    title: "Approval queue",
-    description: "Discount governance and escalation workflows.",
-    icon: ListChecks,
-  },
-  {
-    title: "Fulfillment status",
-    description: "Warehouse allocation and delivery tracking.",
-    icon: Boxes,
-  },
-  {
-    title: "Deal health",
-    description: "AI-assisted deal scoring and negotiation signals.",
-    icon: Sparkles,
-  },
-];
-
 export default async function DashboardPage() {
   const user = await requireAreaAccess("dashboard");
   const stats = await getPlatformStats();
@@ -107,31 +84,80 @@ export default async function DashboardPage() {
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="bg-white lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-sm">Foundations ready</CardTitle>
+            <CardTitle className="text-sm">Operational Pipeline</CardTitle>
             <CardDescription>
-              Phase 1 configures identity, catalog and fulfilment primitives. No
-              business logic exists yet for the modules below.
+              DealFlow360 end-to-end commercial operations: pricing, discount governance, fulfillment, and risk intelligence.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {futureModules.map((module) => (
-              <div
+            {[
+              {
+                title: "Quotations",
+                description: "Sales quotes, dynamic pricing, and customer proposals.",
+                count: stats.quotationCount,
+                countLabel: "total quotes",
+                href: "/quotations",
+                icon: FileText,
+                badgeText: "Active Pipeline",
+                badgeClass: "border-blue-200 bg-blue-50 text-blue-800",
+              },
+              {
+                title: "Approvals",
+                description: "Tiered discount risk governance and sign-off queue.",
+                count: stats.pendingApprovalCount,
+                countLabel: "pending",
+                href: "/approvals",
+                icon: ListChecks,
+                badgeText: stats.pendingApprovalCount > 0 ? "Action Required" : "Up to date",
+                badgeClass: stats.pendingApprovalCount > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800",
+              },
+              {
+                title: "Fulfillment",
+                description: "Multi-warehouse allocation and backorder management.",
+                count: stats.fulfillmentCount,
+                countLabel: "active orders",
+                href: "/fulfillment",
+                icon: Boxes,
+                badgeText: "Operational",
+                badgeClass: "border-slate-200 bg-slate-50 text-slate-800",
+              },
+              {
+                title: "Deal Health Intelligence",
+                description: "0–100 risk scoring and operational anomaly alerts.",
+                count: stats.quotationCount,
+                countLabel: "evaluated deals",
+                href: "/deal-health",
+                icon: Sparkles,
+                badgeText: "Deterministic",
+                badgeClass: "border-indigo-200 bg-indigo-50 text-indigo-800",
+              },
+            ].map((module) => (
+              <Link
                 key={module.title}
-                className="flex items-start gap-3 rounded-lg border border-border bg-background p-4"
+                href={module.href}
+                className="group flex items-start justify-between rounded-lg border border-border bg-background p-4 transition-all hover:border-blue-300 hover:shadow-xs"
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
-                  <module.icon className="size-4 text-muted-foreground" aria-hidden />
-                </span>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{module.title}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                    {module.description}
-                  </p>
-                  <span className="mt-2 inline-flex rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    Planned for a later phase
+                <div className="flex items-start gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted transition-colors group-hover:bg-blue-100 group-hover:text-blue-700">
+                    <module.icon className="size-4 text-muted-foreground group-hover:text-blue-700" aria-hidden />
                   </span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground group-hover:text-blue-700">{module.title}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                      {module.description}
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${module.badgeClass}`}>
+                        {module.badgeText}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground tabular-nums">
+                        {module.count} {module.countLabel}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+                <ArrowRight className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-hover:text-blue-700" aria-hidden />
+              </Link>
             ))}
           </CardContent>
         </Card>

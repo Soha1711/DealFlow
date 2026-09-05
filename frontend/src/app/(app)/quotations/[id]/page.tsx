@@ -367,13 +367,13 @@ export default async function QuotationDetailPage({
                 </Button>
               </CardContent>
             </Card>
-          ) : quotation.status === "APPROVED" &&
+          ) : (quotation.status === "APPROVED" || quotation.status === "CONFIRMED") &&
             (user.role === "ADMIN" || user.role === "OPERATIONS") ? (
             <Card className="bg-white">
               <CardHeader>
                 <CardTitle>Fulfillment</CardTitle>
                 <CardDescription>
-                  This quotation is approved and ready to be fulfilled.
+                  This quotation has been approved/confirmed and is ready to be fulfilled.
                 </CardDescription>
               </CardHeader>
               <CardContent>

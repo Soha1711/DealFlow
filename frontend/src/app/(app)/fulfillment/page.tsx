@@ -50,24 +50,30 @@ export default async function FulfillmentPage({
       { role: user.role, userId: user.id },
       query
     );
-    // Approved quotations with no active fulfillment, ready to be started.
-    const approved = await listQuotations({
-      role: user.role,
-      userId: user.id,
-      page: 1,
-      pageSize: 100,
-      status: "APPROVED",
+    // Approved and confirmed quotations with no active fulfillment, ready to be started.
+    const eligibleQuotations = await db.quotation.findMany({
+      where: {
+        status: { in: ["APPROVED", "CONFIRMED"] },
+        ...(user.role === "SALES_REP" ? { salesRepId: user.id } : {}),
+      },
+      include: {
+        customer: true,
+        salesRep: { select: { id: true, name: true } },
+        _count: { select: { lines: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
     });
-    if (approved.data.length > 0) {
+    if (eligibleQuotations.length > 0) {
       const active = await db.fulfillment.findMany({
         where: {
-          quotationId: { in: approved.data.map((q) => q.id) },
+          quotationId: { in: eligibleQuotations.map((q) => q.id) },
           status: { not: "CANCELLED" },
         },
         select: { quotationId: true },
       });
       const activeIds = new Set(active.map((f) => f.quotationId));
-      awaiting = approved.data.filter((q) => !activeIds.has(q.id));
+      awaiting = eligibleQuotations.filter((q) => !activeIds.has(q.id));
     }
   } catch {
     return (
@@ -102,7 +108,7 @@ export default async function FulfillmentPage({
         <div className="mb-6 overflow-hidden rounded-lg border border-border bg-white">
           <div className="border-b border-border bg-muted/50 px-4 py-3">
             <h2 className="text-sm font-medium text-foreground">
-              Approved quotations awaiting fulfillment
+              Approved & confirmed quotations awaiting fulfillment
             </h2>
           </div>
           <Table>

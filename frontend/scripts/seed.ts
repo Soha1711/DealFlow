@@ -8,6 +8,8 @@ import {
 } from "@prisma/client";
 
 import { createQuotation, submitQuotation } from "../src/lib/modules/quotations/quotation-service";
+import { approveApproval } from "../src/lib/modules/approvals/approval-service";
+import { createFulfillment, allocateFulfillment } from "../src/lib/modules/fulfillment/fulfillment-service";
 import { createBillingFromQuotation } from "../src/lib/modules/billing/billing-service";
 import { issueInvoice } from "../src/lib/modules/billing/invoice-service";
 import { recordPayment } from "../src/lib/modules/billing/payment-service";
@@ -565,6 +567,84 @@ async function main() {
         ],
       });
       console.log(`  negotiation demo: ${q.quotationNumber} submitted UNDER_NEGOTIATION`);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Phase 9 demo: turnkey approval queue, fulfillment backorders & draft quotes
+  // -----------------------------------------------------------------------
+  const existingPendingApprovals = await prisma.approval.count({ where: { status: "PENDING" } });
+  if (existingPendingApprovals > 0) {
+    console.log("  approvals & fulfillment: demo scenarios skipped (pending approvals already exist)");
+  } else {
+    const maya = await prisma.user.findUnique({ where: { email: "maya.chen@dealflow360.io" } });
+    const ravi = await prisma.user.findUnique({ where: { email: "ravi.patel@dealflow360.io" } });
+    const diego = await prisma.user.findUnique({ where: { email: "diego.ramos@dealflow360.io" } });
+    const bluepeak = await prisma.customer.findUnique({ where: { email: "procurement@bluepeakmfg.com" } });
+    const helios = await prisma.customer.findUnique({ where: { email: "finance@helioslogistics.com" } });
+    const northwind = await prisma.customer.findUnique({ where: { email: "billing@northwindtraders.com" } });
+
+    const beaconEdge = await prisma.product.findUnique({ where: { sku: "EDGE-DEV-021" } });
+    const titanSupport = await prisma.product.findUnique({ where: { sku: "SUP-PLT-041" } });
+
+    if (maya && ravi && diego && bluepeak && helios && northwind && beaconEdge && titanSupport) {
+      // 1. Quotation in PENDING_MANAGER (Manager Approval for Ravi Patel)
+      const qManager = await createQuotation({
+        salesRepId: maya.id,
+        customerId: northwind.id,
+        lines: [
+          { productId: beaconEdge.id, quantity: 5, unitPrice: 999, discountPercent: 18 },
+        ],
+      });
+      await submitQuotation(qManager.id, { userId: maya.id, role: Role.SALES_REP });
+      console.log(`  demo approval: ${qManager.quotationNumber} in PENDING_MANAGER (for Ravi Patel)`);
+
+      // 2. Quotation in PENDING_FINANCE (Critical Discount Escalation for Priya Nair)
+      const qFinance = await createQuotation({
+        salesRepId: maya.id,
+        customerId: bluepeak.id,
+        lines: [
+          { productId: titanSupport.id, quantity: 2, unitPrice: 1800, discountPercent: 35 },
+        ],
+      });
+      await submitQuotation(qFinance.id, { userId: maya.id, role: Role.SALES_REP });
+      // Manager approves stage 1, escalating to FINANCE
+      const managerApproval = await prisma.approval.findFirst({
+        where: { quotationId: qFinance.id, level: "MANAGER", status: "PENDING" },
+      });
+      if (managerApproval) {
+        await approveApproval(managerApproval.id, { userId: ravi.id, role: Role.SALES_MANAGER });
+        console.log(`  demo approval: ${qFinance.quotationNumber} escalated to PENDING_FINANCE (for Priya Nair)`);
+      }
+
+      // 3. Editable DRAFT Quotation for AI Recommendations (Maya Chen)
+      const qDraft = await createQuotation({
+        salesRepId: maya.id,
+        customerId: bluepeak.id,
+        lines: [
+          { productId: beaconEdge.id, quantity: 1, unitPrice: 999, discountPercent: 0 },
+        ],
+      });
+      console.log(`  demo draft: ${qDraft.quotationNumber} in DRAFT (for Maya Chen AI recommendations)`);
+
+      // 4. In-Flight Fulfillment with Multi-Warehouse Allocation & Backorder (Diego Ramos)
+      const qFulfill = await createQuotation({
+        salesRepId: maya.id,
+        customerId: helios.id,
+        lines: [
+          { productId: beaconEdge.id, quantity: 240, unitPrice: 999, discountPercent: 0 },
+        ],
+      });
+      await submitQuotation(qFulfill.id, { userId: maya.id, role: Role.SALES_REP });
+      const fulfillment = await createFulfillment(qFulfill.id, {
+        userId: diego.id,
+        role: Role.OPERATIONS,
+      });
+      await allocateFulfillment(fulfillment.id, {
+        userId: diego.id,
+        role: Role.OPERATIONS,
+      });
+      console.log(`  demo fulfillment: ${qFulfill.quotationNumber} allocated with backorder in /fulfillment (Diego Ramos)`);
     }
   }
 
