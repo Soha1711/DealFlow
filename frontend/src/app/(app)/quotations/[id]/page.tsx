@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowUpRight, FilePenLine } from "lucide-react";
+import { ArrowUpRight, Bot, FilePenLine } from "lucide-react";
 
 import { requireAreaAccess } from "@/lib/auth-guards";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -132,6 +132,12 @@ export default async function QuotationDetailPage({
         description={`Created ${formatDate(quotation.createdAt)}`}
       >
         <QuotationStatusBadge status={quotation.status} />
+        <Button asChild variant="outline" className="gap-1.5">
+          <Link href={`/copilot?quotationId=${quotation.id}`}>
+            <Bot className="size-4 text-primary" aria-hidden />
+            Ask Copilot
+          </Link>
+        </Button>
         {editable && (
           <>
             <Button asChild variant="outline">

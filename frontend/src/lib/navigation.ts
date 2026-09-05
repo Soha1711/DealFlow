@@ -25,6 +25,12 @@ export const appNav: NavSection[] = [
         area: "dashboard",
         icon: "dashboard",
       },
+      {
+        title: "Deal Copilot",
+        href: "/copilot",
+        area: "copilot",
+        icon: "copilot",
+      },
     ],
   },
   {

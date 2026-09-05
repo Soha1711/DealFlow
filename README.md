@@ -9,7 +9,7 @@ DealFlow360 integrates the entire enterprise commercial lifecycle into an author
 | Path           | Purpose                                                                 |
 | -------------- | ----------------------------------------------------------------------- |
 | `frontend/`    | Next.js 16 + TypeScript web application (full stack UI, API routes, and domain modules) |
-| `frontend/tests/` | Comprehensive test suite (31 suites, 393 tests covering all domains and E2E lifecycle) |
+| `frontend/tests/` | Comprehensive test suite (105 suites, 407 tests covering all domains, agent automation, and E2E lifecycle) |
 | `database/`    | PostgreSQL Prisma schema and versioned migrations (`database/prisma/`)   |
 | `docs/`        | Architectural and domain specifications (`deal-health.md`, `billing.md`, etc.) |
 
@@ -295,7 +295,45 @@ All accounts use the password: **`DealFlow360!`**
 
 ---
 
-## Complete Feature Matrix (Phases 1–9)
+## Agentic AI Automation Layer & Deal Copilot
+
+DealFlow360 includes an autonomous **Agentic AI Automation Layer** and interactive **Deal Copilot** (`/copilot`) designed for real sales operations automation rather than conversation:
+
+```
+User Task (e.g. "Prepare quotation Q-1001 for approval")
+   │
+   ▼
+Agent Planner (Dynamic Intent Deconstruction & Task Planning)
+   │
+   ▼
+Controlled Tool Call (Strictly typed with Zod, e.g. inspect_quotation, submit_quotation)
+   │
+   ▼
+Existing Domain Service (Quotation, Pricing, Approvals, Fulfillment, Billing)
+   │
+   ▼
+Authoritative RBAC + IDOR Protection + Business Rules + Transactions
+   │
+   ▼
+PostgreSQL Database
+   │
+   ▼
+Tool Result & Observation
+   │
+   ▼
+Autonomous Agent Loop (Evaluates result, checks safety gate, decides next tool, finishes)
+```
+
+### Key Capabilities
+- **Real Autonomous Operations**: Executes multi-step workflows like `PREPARE_QUOTATION_FOR_APPROVAL` (inspect quote → assess deal health & risk → inspect product recommendations → submit for approval routing → verify manager/finance escalation).
+- **Zero Raw DB Access by Agent**: The agent interacts exclusively through the controlled tool registry (`tool-registry.ts`) calling underlying domain services.
+- **Safety Confirmation Gates**: High-impact actions (`approve_deal`, `reject_deal`, `issue_invoice`, `respond_negotiation`) automatically pause execution (`AWAITING_CONFIRMATION`), requiring explicit confirmation before mutating commercial state.
+- **Immutable Audit Trail**: Structured log of all agent runs, planning steps, inputs, outputs, timestamps, and durations accessible via `/api/agent/audit`.
+- **Interactive Deal Copilot UI (`/copilot`)**: Live execution stepper, tool trace inspection, confirmation banners, quick-action chips, and audit trail viewer.
+
+---
+
+## Complete Feature Matrix (Phases 1–9 + Agentic AI)
 
 - **Application Shell & RBAC**: Next.js 16 + TypeScript, Tailwind CSS v4, shadcn/ui, Auth.js credentials, and role-based route protection for 6 distinct personas.
 - **Quotation Engine**: Strict Decimal arithmetic, multi-line pricing, year-sequenced quotation numbering (`QUOT-YYYY-XXXX`), and full draft editing.
@@ -305,4 +343,5 @@ All accounts use the password: **`DealFlow360!`**
 - **Hybrid Billing**: Unified generation of one-time invoices and recurring subscriptions, period billing schedules, and idempotent payment recording.
 - **Customer Portal & Structured Negotiations**: Scoped customer portal, information hiding (zero cost/margin leakage), and bi-directional counter-negotiation workflows.
 - **Deal Health Intelligence**: Pure deterministic deal health scoring (0–100), health tier classification, and automated operational anomaly detection.
-- **Hardened & Tested**: 393 tests passing across 99 suites, zero typecheck/lint warnings, clean production builds, and turnkey seed data.
+- **Agentic AI Automation Layer & Deal Copilot**: Multi-step autonomous sales operations agent, controlled tool registry, safety confirmation gates, immutable audit trail, and Deal Copilot UI (`/copilot`).
+- **Hardened & Tested**: **407 tests passing** across 105 suites, zero typecheck/lint warnings, clean production builds, and turnkey seed data.

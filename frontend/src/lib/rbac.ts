@@ -7,6 +7,7 @@ import type { Role } from "@prisma/client";
  */
 export type AppArea =
   | "dashboard"
+  | "copilot"
   | "portal"
   | "quotations"
   | "approvals"
@@ -24,6 +25,7 @@ const allowedRoles = (...roles: Role[]) => roles;
 
 const AREA_ACCESS: Record<AppArea, Role[]> = {
   dashboard: allowedRoles("ADMIN", "SALES_REP", "SALES_MANAGER", "FINANCE", "OPERATIONS", "CUSTOMER"),
+  copilot: allowedRoles("ADMIN", "SALES_REP", "SALES_MANAGER", "FINANCE", "OPERATIONS", "CUSTOMER"),
   portal: allowedRoles("ADMIN", "CUSTOMER"),
   quotations: allowedRoles("ADMIN", "SALES_REP", "SALES_MANAGER"),
   approvals: allowedRoles("ADMIN", "SALES_MANAGER", "FINANCE"),

@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bot,
   Boxes,
   Building2,
   ChartLine,
@@ -15,6 +16,7 @@ import {
 
 export const NAV_ICONS = {
   dashboard: LayoutDashboard,
+  copilot: Bot,
   portal: Building2,
   quotations: FileText,
   approvals: CheckSquare2,
