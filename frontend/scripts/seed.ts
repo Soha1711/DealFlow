@@ -8,35 +8,49 @@ import {
 } from "@prisma/client";
 
 import { createQuotation, submitQuotation } from "../src/lib/modules/quotations/quotation-service";
-import { approveApproval } from "../src/lib/modules/approvals/approval-service";
-import { createFulfillment, allocateFulfillment } from "../src/lib/modules/fulfillment/fulfillment-service";
+import { approveApproval, rejectApproval } from "../src/lib/modules/approvals/approval-service";
+import { createFulfillment, allocateFulfillment, fulfillFulfillment } from "../src/lib/modules/fulfillment/fulfillment-service";
 import { createBillingFromQuotation } from "../src/lib/modules/billing/billing-service";
 import { issueInvoice } from "../src/lib/modules/billing/invoice-service";
 import { recordPayment } from "../src/lib/modules/billing/payment-service";
 import { billSubscription } from "../src/lib/modules/billing/subscription-service";
-import { submitCustomerNegotiation } from "../src/lib/modules/negotiations/negotiation-service";
+import { submitCustomerNegotiation, counterNegotiation } from "../src/lib/modules/negotiations/negotiation-service";
 
 const prisma = new PrismaClient();
 
-/** Rounds a Decimal to 2dp (same rule as the billing engine). */
 function round2(value: Prisma.Decimal): Prisma.Decimal {
   return value.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 }
 
-const DEMO_PASSWORD = "DealFlow360!";
+export const DEMO_PASSWORD = "DealFlow360!";
 const PASSWORD_ROUNDS = 10;
 
-async function main() {
-  console.log("Seeding DealFlow360 database...");
+async function resetTransactionalData() {
+  console.log("  reset: cleaning transactional demo records for a fresh connected state...");
+  await prisma.quotationNegotiation.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.billingSchedule.updateMany({ data: { invoiceId: null } });
+  await prisma.invoiceLine.deleteMany();
+  await prisma.invoice.deleteMany();
+  await prisma.billingSchedule.deleteMany();
+  await prisma.subscription.deleteMany();
+  await prisma.inventoryReservation.deleteMany();
+  await prisma.fulfillmentAllocation.deleteMany();
+  await prisma.fulfillmentLine.deleteMany();
+  await prisma.fulfillment.deleteMany();
+  await prisma.approval.deleteMany();
+  await prisma.quotationLine.deleteMany();
+  await prisma.quotation.deleteMany();
+  console.log("  reset: transactional tables ready.");
+}
 
+async function main() {
+  console.log("Seeding DealFlow360 realistic demo data...");
+
+  // 1. Seed Core Users (all 6 roles)
   const userByEmail: Record<string, string> = {};
 
-  const seedUsers: {
-    name: string;
-    email: string;
-    role: Role;
-    salesTeamId?: string;
-  }[] = [
+  const seedUsers = [
     {
       name: "Avery Stone",
       email: "avery.stone@dealflow360.io",
@@ -90,9 +104,10 @@ async function main() {
       },
     });
     userByEmail[u.email] = user.id;
-    console.log(`  user  : ${u.email} (${u.role})`);
+    console.log(`  user: ${u.email} (${u.role})`);
   }
 
+  // 2. Seed Customers (Multiple accounts across tiers)
   const seedCustomers = [
     {
       name: "Northwind Traders Inc",
@@ -109,28 +124,35 @@ async function main() {
       email: "finance@helioslogistics.com",
       tier: CustomerTier.SILVER,
     },
+    {
+      name: "Apex Global Systems",
+      email: "contracts@apexglobal.io",
+      tier: CustomerTier.STANDARD,
+    },
   ];
 
+  const customerIdByEmail: Record<string, string> = {};
   for (const c of seedCustomers) {
-    await prisma.customer.upsert({
+    const cust = await prisma.customer.upsert({
       where: { email: c.email },
       update: { name: c.name, tier: c.tier },
       create: c,
     });
+    customerIdByEmail[c.email] = cust.id;
   }
-  console.log(`  customer: ${seedCustomers.length} accounts upserted`);
+  console.log(`  customers: ${seedCustomers.length} accounts configured`);
 
-  const northwindCustomer = await prisma.customer.findUnique({
-    where: { email: "billing@northwindtraders.com" },
-  });
-  if (northwindCustomer) {
+  // Link Jordan Lee to Northwind Traders Inc for Customer Portal
+  const northwindId = customerIdByEmail["billing@northwindtraders.com"];
+  if (northwindId) {
     await prisma.user.updateMany({
       where: { email: "jordan.lee@dealflow360.io" },
-      data: { customerId: northwindCustomer.id },
+      data: { customerId: northwindId },
     });
-    console.log("  customer-link: jordan.lee linked to Northwind Traders Inc");
+    console.log("  customer-link: jordan.lee linked to Northwind Traders Inc (GOLD tier)");
   }
 
+  // 3. Subscription Plans
   const seedPlans = [
     { name: "CRM Enterprise", price: 240.0, billingInterval: BillingInterval.ANNUAL },
     { name: "Analytics Pro", price: 120.0, billingInterval: BillingInterval.MONTHLY },
@@ -146,8 +168,8 @@ async function main() {
     });
     planIdByName[p.name] = plan.id;
   }
-  console.log(`  subscription plan: ${seedPlans.length} plans upserted`);
 
+  // 4. Products Catalog
   const seedProducts = [
     {
       name: "Meridian CRM Enterprise",
@@ -206,6 +228,15 @@ async function main() {
       maxDiscountPercent: 12,
       isRecurring: false,
     },
+    {
+      name: "Cloud Sentinel Appliance",
+      sku: "SENT-APP-051",
+      category: "Hardware",
+      price: 3500.0,
+      cost: 2100.0,
+      maxDiscountPercent: 10,
+      isRecurring: false,
+    },
   ];
 
   const productIdBySku: Record<string, string> = {};
@@ -225,8 +256,9 @@ async function main() {
     });
     productIdBySku[p.sku] = product.id;
   }
-  console.log(`  product: ${seedProducts.length} products upserted`);
+  console.log(`  products: ${seedProducts.length} catalog items configured`);
 
+  // 5. Discount Tiers
   const seedTiers = [
     {
       name: "Standard Discount",
@@ -259,8 +291,8 @@ async function main() {
       create: t,
     });
   }
-  console.log(`  discount tier: ${seedTiers.length} tiers upserted`);
 
+  // 6. Multi-Warehouse Setup
   const seedWarehouses = [
     { name: "Cincinnati Distribution Center", location: "Cincinnati, OH, USA" },
     { name: "Reno Logistics Hub", location: "Reno, NV, USA" },
@@ -275,40 +307,44 @@ async function main() {
     });
     warehouseIdByName[w.name] = warehouse.id;
   }
-  console.log(`  warehouse: ${seedWarehouses.length} warehouses upserted`);
 
+  const cincinnatiId = warehouseIdByName["Cincinnati Distribution Center"];
+  const renoId = warehouseIdByName["Reno Logistics Hub"];
   const beaconEdgeId = productIdBySku["EDGE-DEV-021"];
   const migrationServiceId = productIdBySku["MIG-SVC-031"];
   const titanSupportId = productIdBySku["SUP-PLT-041"];
   const crmEnterpriseId = productIdBySku["CRM-ENT-001"];
   const analyticsProId = productIdBySku["ANL-PRO-002"];
-  const cincinnatiId = warehouseIdByName["Cincinnati Distribution Center"];
-  const renoId = warehouseIdByName["Reno Logistics Hub"];
+  const sentinelId = productIdBySku["SENT-APP-051"];
 
+  // 7. Controlled Reset of Transactional Data
+  await resetTransactionalData();
+
+  // 8. Re-initialize authoritative Inventory
   const seedInventory = [
     {
       warehouseId: cincinnatiId,
       productId: beaconEdgeId,
       quantity: 120,
-      reservedQuantity: 8,
+      reservedQuantity: 0,
     },
     {
       warehouseId: renoId,
       productId: beaconEdgeId,
       quantity: 80,
-      reservedQuantity: 5,
+      reservedQuantity: 0,
     },
     {
       warehouseId: cincinnatiId,
       productId: migrationServiceId,
-      quantity: 15,
-      reservedQuantity: 2,
+      quantity: 25,
+      reservedQuantity: 0,
     },
     {
       warehouseId: renoId,
       productId: titanSupportId,
       quantity: 200,
-      reservedQuantity: 10,
+      reservedQuantity: 0,
     },
     {
       warehouseId: cincinnatiId,
@@ -320,6 +356,19 @@ async function main() {
       warehouseId: renoId,
       productId: analyticsProId,
       quantity: 3000,
+      reservedQuantity: 0,
+    },
+    // Low stock product: Cloud Sentinel Appliance (only 14 units total: 8 in Cincy, 6 in Reno)
+    {
+      warehouseId: cincinnatiId,
+      productId: sentinelId,
+      quantity: 8,
+      reservedQuantity: 0,
+    },
+    {
+      warehouseId: renoId,
+      productId: sentinelId,
+      quantity: 6,
       reservedQuantity: 0,
     },
   ];
@@ -334,323 +383,354 @@ async function main() {
       },
       update: {
         quantity: inv.quantity,
-        reservedQuantity: inv.reservedQuantity,
+        reservedQuantity: 0,
       },
       create: inv,
     });
   }
-  console.log(`  inventory: ${seedInventory.length} records upserted`);
+  console.log(`  inventory: configured stock across Cincinnati and Reno warehouses (including low-stock Sentinel)`);
 
-  // -------------------------------------------------------------------------
-  // Reservation-ledger reconciliation (Phase 5)
-  // -------------------------------------------------------------------------
-  // The Phase 1 seed set non-zero reservedQuantity values before the
-  // InventoryReservation ledger existed. To make reserved inventory auditable
-  // without changing effective availability (quantity − reservedQuantity), we
-  // back each legacy reserved counter with an ACTIVE reservation ledger row
-  // (not tied to any allocation) when none exists. This is deterministic and
-  // idempotent: re-running the seed never double-books.
-  const legacyReserved = await prisma.inventory.findMany({
-    where: { reservedQuantity: { gt: 0 } },
-    select: { id: true, reservedQuantity: true },
+  // Actors for domain services
+  const mayaId = userByEmail["maya.chen@dealflow360.io"];
+  const raviId = userByEmail["ravi.patel@dealflow360.io"];
+  const priyaId = userByEmail["priya.nair@dealflow360.io"];
+  const diegoId = userByEmail["diego.ramos@dealflow360.io"];
+  const jordanId = userByEmail["jordan.lee@dealflow360.io"];
+
+  const salesRepActor = { userId: mayaId, role: Role.SALES_REP };
+  const managerActor = { userId: raviId, role: Role.SALES_MANAGER };
+  const financeActor = { userId: priyaId, role: Role.FINANCE };
+  const opsActor = { userId: diegoId, role: Role.OPERATIONS };
+
+  const bluepeakId = customerIdByEmail["procurement@bluepeakmfg.com"];
+  const heliosId = customerIdByEmail["finance@helioslogistics.com"];
+  const apexId = customerIdByEmail["contracts@apexglobal.io"];
+
+  console.log("\n  --- SEEDING CONNECTED ENTERPRISE DEMO SCENARIOS ---");
+
+  // =========================================================================
+  // 1. SALES REP (Maya Chen) SCENARIOS
+  // =========================================================================
+  // DRAFT 1: Interactive Draft for AI Product Recommendations
+  const qDraftAi = await createQuotation({
+    salesRepId: mayaId,
+    customerId: bluepeakId,
+    lines: [
+      { productId: beaconEdgeId, quantity: 1, unitPrice: 999, discountPercent: 0 },
+    ],
   });
-  for (const row of legacyReserved) {
-    const hasLedger = await prisma.inventoryReservation.count({
-      where: { inventoryId: row.id, status: "ACTIVE" },
-    });
-    if (hasLedger === 0) {
-      await prisma.inventoryReservation.create({
-        data: {
-          inventoryId: row.id,
-          quantity: row.reservedQuantity,
-          status: "ACTIVE",
-        },
-      });
-      console.log(
-        `  reservation: backfilled ${row.reservedQuantity} units for inventory ${row.id}`
-      );
-    }
+  console.log(`  [SALES_REP] Draft 1: ${qDraftAi.quotationNumber} in DRAFT (Bluepeak) - ready for AI upsells`);
+
+  // DRAFT 2: Clean Draft ready for immediate submission
+  const qDraftSubmit = await createQuotation({
+    salesRepId: mayaId,
+    customerId: apexId,
+    lines: [
+      { productId: beaconEdgeId, quantity: 2, unitPrice: 999, discountPercent: 5 },
+      { productId: crmEnterpriseId, quantity: 1, unitPrice: 240, discountPercent: 5 },
+    ],
+  });
+  console.log(`  [SALES_REP] Draft 2: ${qDraftSubmit.quotationNumber} in DRAFT (Apex Global) - ready to submit`);
+
+  // SUBMITTED: Auto-Approved Low-Risk Quotation
+  const qAutoApproved = await createQuotation({
+    salesRepId: mayaId,
+    customerId: apexId,
+    lines: [
+      { productId: analyticsProId, quantity: 2, unitPrice: 120, discountPercent: 5 },
+    ],
+  });
+  await submitQuotation(qAutoApproved.id, salesRepActor);
+  console.log(`  [SALES_REP] Auto-Approved: ${qAutoApproved.quotationNumber} (Apex Global) - status APPROVED (Risk: LOW)`);
+
+  // =========================================================================
+  // 2. SALES MANAGER (Ravi Patel) APPROVAL SCENARIOS
+  // =========================================================================
+  // Pending Approval 1: Medium Risk (18% discount on Beacon Edge)
+  const qPendingManager1 = await createQuotation({
+    salesRepId: mayaId,
+    customerId: northwindId,
+    lines: [
+      { productId: beaconEdgeId, quantity: 5, unitPrice: 999, discountPercent: 18 },
+    ],
+  });
+  await submitQuotation(qPendingManager1.id, salesRepActor);
+  console.log(`  [SALES_MANAGER] Pending 1: ${qPendingManager1.quotationNumber} in PENDING_MANAGER (Northwind Traders, 18% discount)`);
+
+  // Pending Approval 2: Medium-High Risk (20% discount on Services)
+  const qPendingManager2 = await createQuotation({
+    salesRepId: mayaId,
+    customerId: heliosId,
+    lines: [
+      { productId: migrationServiceId, quantity: 1, unitPrice: 8000, discountPercent: 20 },
+    ],
+  });
+  await submitQuotation(qPendingManager2.id, salesRepActor);
+  console.log(`  [SALES_MANAGER] Pending 2: ${qPendingManager2.quotationNumber} in PENDING_MANAGER (Helios Logistics, 20% discount)`);
+
+  // Previously Rejected Deal: Excessive 45% discount rejected by Ravi Patel
+  const qRejected = await createQuotation({
+    salesRepId: mayaId,
+    customerId: bluepeakId,
+    lines: [
+      { productId: migrationServiceId, quantity: 2, unitPrice: 8000, discountPercent: 45 },
+    ],
+  });
+  await submitQuotation(qRejected.id, salesRepActor);
+  const rejectApprovalRec = await prisma.approval.findFirst({
+    where: { quotationId: qRejected.id, status: "PENDING", level: "MANAGER" },
+  });
+  if (rejectApprovalRec) {
+    await rejectApproval(
+      rejectApprovalRec.id,
+      managerActor,
+      "Discount request of 45% exceeds regional margin tolerance. Maximum allowable discount is 20%."
+    );
+    console.log(`  [SALES_MANAGER] Rejected: ${qRejected.quotationNumber} (Bluepeak) - status REJECTED with commercial feedback`);
   }
 
-  // -----------------------------------------------------------------------
-  // Phase 6 demo: hybrid billing scenarios
-  // -----------------------------------------------------------------------
-  // Only created on a database that has no invoices yet (fresh setup / after a
-  // migrate reset). Re-running the seed after the app has been used leaves
-  // the demo billing data untouched, so quotation numbers and invoices are
-  // never duplicated. Every artifact is produced through the real domain
-  // services (createQuotation → submit → billing → issue → payments), so the
-  // state machines, pricing and Decimal arithmetic are authoritative.
-  const existingInvoices = await prisma.invoice.count();
-  if (existingInvoices > 0) {
-    console.log("  billing: demo scenarios skipped (invoices already exist)");
-  } else {
-    const mayaId = userByEmail["maya.chen@dealflow360.io"];
-    const priyaId = userByEmail["priya.nair@dealflow360.io"];
-    if (mayaId && priyaId) {
-      const salesRepActor = { userId: mayaId, role: Role.SALES_REP };
-      const financeActor = { userId: priyaId, role: Role.FINANCE };
-
-      const customerIdByEmail: Record<string, string> = {};
-      for (const c of seedCustomers) {
-        const customer = await prisma.customer.findUnique({
-          where: { email: c.email },
-          select: { id: true },
-        });
-        if (customer) customerIdByEmail[c.email] = customer.id;
-      }
-      const northwind = customerIdByEmail["billing@northwindtraders.com"];
-      const bluepeak = customerIdByEmail["procurement@bluepeakmfg.com"];
-      const helios = customerIdByEmail["finance@helioslogistics.com"];
-
-      const edge = productIdBySku["EDGE-DEV-021"];
-      const migration = productIdBySku["MIG-SVC-031"];
-      const crm = productIdBySku["CRM-ENT-001"];
-      const analytics = productIdBySku["ANL-PRO-002"];
-      const api = productIdBySku["API-ACC-011"];
-
-      // Helper: build a quotation and run it through submit. Discounts are
-      // kept within each product's limit so the deterministic risk check is
-      // LOW and the quotation is APPROVED without a manager/finance chain.
-      async function approvedQuote(
-        customerId: string,
-        label: string,
-        lines: { productId: string; quantity: number; unitPrice: number; discountPercent: number }[]
-      ) {
-        const quote = await createQuotation({
-          salesRepId: mayaId,
-          customerId,
-          lines,
-        });
-        await submitQuotation(quote.id, salesRepActor);
-        console.log(`  billing demo: ${label} → ${quote.quotationNumber} (APPROVED)`);
-        return quote;
-      }
-
-      // 1–3. One-time / recurring / hybrid quotations left APPROVED and
-      // unbilled — Finance sees these in the “ready to bill” pool.
-      if (northwind && edge) {
-        await approvedQuote(northwind, "one-time (Beacon Edge ×2)", [
-          { productId: edge, quantity: 2, unitPrice: 999, discountPercent: 5 },
-        ]);
-      }
-      if (bluepeak && crm) {
-        await approvedQuote(bluepeak, "recurring (CRM Enterprise ×1)", [
-          { productId: crm, quantity: 1, unitPrice: 240, discountPercent: 20 },
-        ]);
-      }
-      if (helios && edge && analytics) {
-        await approvedQuote(helios, "hybrid (Beacon Edge ×1 + Analytics Pro ×1)", [
-          { productId: edge, quantity: 1, unitPrice: 999, discountPercent: 5 },
-          { productId: analytics, quantity: 1, unitPrice: 120, discountPercent: 10 },
-        ]);
-      }
-
-      // 4. One-time quotation that is billed and issued (no payment yet).
-      if (northwind && migration) {
-        const q = await approvedQuote(northwind, "billed one-time (Data Migration ×1)", [
-          { productId: migration, quantity: 1, unitPrice: 8000, discountPercent: 10 },
-        ]);
-        const billing = await createBillingFromQuotation(q.id, financeActor);
-        if (billing.oneTimeInvoice) {
-          await issueInvoice(billing.oneTimeInvoice.id, financeActor);
-          console.log(
-            `  billing demo: invoice ${billing.oneTimeInvoice.invoiceNumber} ISSUED`
-          );
-        }
-      }
-
-      // 5. Recurring quotation fully billed and paid, then the next period is
-      // generated — an active subscription with billing history + upcoming
-      // schedule.
-      if (bluepeak && analytics) {
-        const q = await approvedQuote(bluepeak, "billed recurring (Analytics Pro ×1)", [
-          { productId: analytics, quantity: 1, unitPrice: 120, discountPercent: 10 },
-        ]);
-        const billing = await createBillingFromQuotation(q.id, financeActor);
-        const subscription = billing.subscriptions[0];
-        if (subscription) {
-          const firstInvoice = subscription.schedules[0]?.invoice;
-          if (firstInvoice) {
-            await issueInvoice(firstInvoice.id, financeActor);
-            const full = await prisma.invoice.findUniqueOrThrow({
-              where: { id: firstInvoice.id },
-              select: { total: true },
-            });
-            await recordPayment(firstInvoice.id, financeActor, {
-              amount: full.total.toString(),
-              method: "BANK_TRANSFER",
-              reference: `Seed payment for ${firstInvoice.invoiceNumber}`,
-            });
-            console.log(
-              `  billing demo: recurring invoice ${firstInvoice.invoiceNumber} PAID`
-            );
-          }
-          // Generate the next billing period so the subscription shows an
-          // upcoming (DRAFT invoice / DUE schedule) cycle.
-          const next = await billSubscription(subscription.id, financeActor);
-          console.log(
-            `  billing demo: subscription ${subscription.id} — next period scheduled (invoice ${next.invoiceId})`
-          );
-        }
-      }
-
-      // 6. Hybrid quotation billed and partially paid on the one-time
-      // invoice; the recurring line becomes an active subscription.
-      if (helios && edge && api) {
-        const q = await approvedQuote(helios, "billed hybrid (Beacon Edge ×2 + API Access ×1)", [
-          { productId: edge, quantity: 2, unitPrice: 999, discountPercent: 5 },
-          { productId: api, quantity: 1, unitPrice: 650, discountPercent: 10 },
-        ]);
-        const billing = await createBillingFromQuotation(q.id, financeActor);
-        if (billing.oneTimeInvoice) {
-          await issueInvoice(billing.oneTimeInvoice.id, financeActor);
-          const total = await prisma.invoice.findUniqueOrThrow({
-            where: { id: billing.oneTimeInvoice.id },
-            select: { total: true },
-          });
-          // Record ~40% so the invoice is PARTIALLY_PAID.
-          const partial = round2(new Prisma.Decimal(total.total.toString()).times("0.4"));
-          await recordPayment(billing.oneTimeInvoice.id, financeActor, {
-            amount: partial.toString(),
-            method: "BANK_TRANSFER",
-            reference: `Seed partial payment for ${billing.oneTimeInvoice.invoiceNumber}`,
-          });
-          console.log(
-            `  billing demo: invoice ${billing.oneTimeInvoice.invoiceNumber} PARTIALLY_PAID`
-          );
-        }
-        if (billing.subscriptions.length > 0) {
-          console.log(
-            `  billing demo: hybrid subscription created (${billing.subscriptions[0].id})`
-          );
-        }
-      }
-    }
+  // =========================================================================
+  // 3. FINANCE (Priya Nair) & ESCALATION SCENARIOS
+  // =========================================================================
+  // Pending Finance Approval: Deep 35% discount escalated through Manager to Finance
+  const qPendingFinance = await createQuotation({
+    salesRepId: mayaId,
+    customerId: bluepeakId,
+    lines: [
+      { productId: titanSupportId, quantity: 3, unitPrice: 1800, discountPercent: 35 },
+    ],
+  });
+  await submitQuotation(qPendingFinance.id, salesRepActor);
+  const mgrStage = await prisma.approval.findFirst({
+    where: { quotationId: qPendingFinance.id, level: "MANAGER", status: "PENDING" },
+  });
+  if (mgrStage) {
+    await approveApproval(mgrStage.id, managerActor);
+    console.log(`  [FINANCE] Pending Finance: ${qPendingFinance.quotationNumber} in PENDING_FINANCE (Bluepeak, 35% discount approved by Manager)`);
   }
 
-  // -----------------------------------------------------------------------
-  // Phase 7 demo: customer quotation negotiation
-  // -----------------------------------------------------------------------
-  const existingNegotiations = await prisma.quotationNegotiation.count();
-  if (existingNegotiations > 0) {
-    console.log("  negotiation: demo scenarios skipped (negotiations already exist)");
-  } else {
-    const jordan = await prisma.user.findUnique({
-      where: { email: "jordan.lee@dealflow360.io" },
+  // Hybrid Billing: Quotation approved, billed, and active subscription generated
+  const qHybridBilled = await createQuotation({
+    salesRepId: mayaId,
+    customerId: heliosId,
+    lines: [
+      { productId: beaconEdgeId, quantity: 2, unitPrice: 999, discountPercent: 5 },
+      { productId: analyticsProId, quantity: 1, unitPrice: 120, discountPercent: 10 },
+    ],
+  });
+  await submitQuotation(qHybridBilled.id, salesRepActor);
+  const billingHybrid = await createBillingFromQuotation(qHybridBilled.id, financeActor);
+  if (billingHybrid.oneTimeInvoice) {
+    await issueInvoice(billingHybrid.oneTimeInvoice.id, financeActor);
+    // Partially paid (~40%)
+    const partialAmount = round2(new Prisma.Decimal(billingHybrid.oneTimeInvoice.total.toString()).times("0.4"));
+    await recordPayment(billingHybrid.oneTimeInvoice.id, financeActor, {
+      amount: partialAmount.toString(),
+      method: "BANK_TRANSFER",
+      reference: `Initial wire transfer for ${billingHybrid.oneTimeInvoice.invoiceNumber}`,
     });
-    const maya = await prisma.user.findUnique({
-      where: { email: "maya.chen@dealflow360.io" },
-    });
-    const northwind = await prisma.customer.findUnique({
-      where: { email: "billing@northwindtraders.com" },
-    });
-    const beaconEdge = await prisma.product.findUnique({
-      where: { sku: "EDGE-DEV-021" },
-    });
-
-    if (jordan && maya && northwind && beaconEdge) {
-      const q = await createQuotation({
-        salesRepId: maya.id,
-        customerId: northwind.id,
-        lines: [
-          { productId: beaconEdge.id, quantity: 2, unitPrice: 999, discountPercent: 5 },
-        ],
-      });
-      await submitQuotation(q.id, { userId: maya.id, role: Role.SALES_REP });
-      await submitCustomerNegotiation(q.id, northwind.id, jordan.id, {
-        message:
-          "We are planning to deploy the Beacon Edge Device across 4 distribution hubs. If we commit to 4 units, can you provide a 15% volume discount?",
-        targetTotal: 3400,
-        proposedLines: [
-          { productId: beaconEdge.id, requestedQuantity: 4, requestedDiscountPercent: 15 },
-        ],
-      });
-      console.log(`  negotiation demo: ${q.quotationNumber} submitted UNDER_NEGOTIATION`);
-    }
+    console.log(`  [FINANCE] Invoice ${billingHybrid.oneTimeInvoice.invoiceNumber} PARTIALLY_PAID (Helios Logistics, 40% paid)`);
   }
 
-  // -----------------------------------------------------------------------
-  // Phase 9 demo: turnkey approval queue, fulfillment backorders & draft quotes
-  // -----------------------------------------------------------------------
-  const existingPendingApprovals = await prisma.approval.count({ where: { status: "PENDING" } });
-  if (existingPendingApprovals > 0) {
-    console.log("  approvals & fulfillment: demo scenarios skipped (pending approvals already exist)");
-  } else {
-    const maya = await prisma.user.findUnique({ where: { email: "maya.chen@dealflow360.io" } });
-    const ravi = await prisma.user.findUnique({ where: { email: "ravi.patel@dealflow360.io" } });
-    const diego = await prisma.user.findUnique({ where: { email: "diego.ramos@dealflow360.io" } });
-    const bluepeak = await prisma.customer.findUnique({ where: { email: "procurement@bluepeakmfg.com" } });
-    const helios = await prisma.customer.findUnique({ where: { email: "finance@helioslogistics.com" } });
-    const northwind = await prisma.customer.findUnique({ where: { email: "billing@northwindtraders.com" } });
+  // Overdue Invoice & Failed Payment Example
+  const qOverdue = await createQuotation({
+    salesRepId: mayaId,
+    customerId: bluepeakId,
+    lines: [
+      { productId: beaconEdgeId, quantity: 3, unitPrice: 999, discountPercent: 5 },
+    ],
+  });
+  await submitQuotation(qOverdue.id, salesRepActor);
+  const billingOverdue = await createBillingFromQuotation(qOverdue.id, financeActor);
+  if (billingOverdue.oneTimeInvoice) {
+    await issueInvoice(billingOverdue.oneTimeInvoice.id, financeActor);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const fifteenDaysAgo = new Date();
+    fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
 
-    const beaconEdge = await prisma.product.findUnique({ where: { sku: "EDGE-DEV-021" } });
-    const titanSupport = await prisma.product.findUnique({ where: { sku: "SUP-PLT-041" } });
+    await prisma.invoice.update({
+      where: { id: billingOverdue.oneTimeInvoice.id },
+      data: {
+        issueDate: thirtyDaysAgo,
+        dueDate: fifteenDaysAgo,
+        status: "OVERDUE",
+      },
+    });
 
-    if (maya && ravi && diego && bluepeak && helios && northwind && beaconEdge && titanSupport) {
-      // 1. Quotation in PENDING_MANAGER (Manager Approval for Ravi Patel)
-      const qManager = await createQuotation({
-        salesRepId: maya.id,
-        customerId: northwind.id,
-        lines: [
-          { productId: beaconEdge.id, quantity: 5, unitPrice: 999, discountPercent: 18 },
-        ],
-      });
-      await submitQuotation(qManager.id, { userId: maya.id, role: Role.SALES_REP });
-      console.log(`  demo approval: ${qManager.quotationNumber} in PENDING_MANAGER (for Ravi Patel)`);
-
-      // 2. Quotation in PENDING_FINANCE (Critical Discount Escalation for Priya Nair)
-      const qFinance = await createQuotation({
-        salesRepId: maya.id,
-        customerId: bluepeak.id,
-        lines: [
-          { productId: titanSupport.id, quantity: 2, unitPrice: 1800, discountPercent: 35 },
-        ],
-      });
-      await submitQuotation(qFinance.id, { userId: maya.id, role: Role.SALES_REP });
-      // Manager approves stage 1, escalating to FINANCE
-      const managerApproval = await prisma.approval.findFirst({
-        where: { quotationId: qFinance.id, level: "MANAGER", status: "PENDING" },
-      });
-      if (managerApproval) {
-        await approveApproval(managerApproval.id, { userId: ravi.id, role: Role.SALES_MANAGER });
-        console.log(`  demo approval: ${qFinance.quotationNumber} escalated to PENDING_FINANCE (for Priya Nair)`);
-      }
-
-      // 3. Editable DRAFT Quotation for AI Recommendations (Maya Chen)
-      const qDraft = await createQuotation({
-        salesRepId: maya.id,
-        customerId: bluepeak.id,
-        lines: [
-          { productId: beaconEdge.id, quantity: 1, unitPrice: 999, discountPercent: 0 },
-        ],
-      });
-      console.log(`  demo draft: ${qDraft.quotationNumber} in DRAFT (for Maya Chen AI recommendations)`);
-
-      // 4. In-Flight Fulfillment with Multi-Warehouse Allocation & Backorder (Diego Ramos)
-      const qFulfill = await createQuotation({
-        salesRepId: maya.id,
-        customerId: helios.id,
-        lines: [
-          { productId: beaconEdge.id, quantity: 240, unitPrice: 999, discountPercent: 0 },
-        ],
-      });
-      await submitQuotation(qFulfill.id, { userId: maya.id, role: Role.SALES_REP });
-      const fulfillment = await createFulfillment(qFulfill.id, {
-        userId: diego.id,
-        role: Role.OPERATIONS,
-      });
-      await allocateFulfillment(fulfillment.id, {
-        userId: diego.id,
-        role: Role.OPERATIONS,
-      });
-      console.log(`  demo fulfillment: ${qFulfill.quotationNumber} allocated with backorder in /fulfillment (Diego Ramos)`);
-    }
+    // Record a failed credit card attempt
+    await prisma.payment.create({
+      data: {
+        invoiceId: billingOverdue.oneTimeInvoice.id,
+        amount: billingOverdue.oneTimeInvoice.total,
+        status: "FAILED",
+        method: "CREDIT_CARD",
+        reference: "DECLINED_CARD_EXPIRED",
+        paidAt: new Date(),
+      },
+    });
+    console.log(`  [FINANCE] Invoice ${billingOverdue.oneTimeInvoice.invoiceNumber} OVERDUE with FAILED payment attempt (Bluepeak)`);
   }
 
-  console.log("Seed complete.");
-  console.log("");
-  console.log(`Demo password for all seeded users: ${DEMO_PASSWORD}`);
+  // Active Subscription with History
+  const qSubHistory = await createQuotation({
+    salesRepId: mayaId,
+    customerId: bluepeakId,
+    lines: [
+      { productId: crmEnterpriseId, quantity: 1, unitPrice: 240, discountPercent: 10 },
+    ],
+  });
+  await submitQuotation(qSubHistory.id, salesRepActor);
+  const billingSub = await createBillingFromQuotation(qSubHistory.id, financeActor);
+  if (billingSub.subscriptions[0]) {
+    const sub = billingSub.subscriptions[0];
+    const firstInvoice = sub.schedules[0]?.invoice;
+    if (firstInvoice) {
+      await issueInvoice(firstInvoice.id, financeActor);
+      const invTotal = await prisma.invoice.findUniqueOrThrow({
+        where: { id: firstInvoice.id },
+        select: { total: true },
+      });
+      await recordPayment(firstInvoice.id, financeActor, {
+        amount: invTotal.total.toString(),
+        method: "ACH",
+        reference: `Annual subscription fee for ${firstInvoice.invoiceNumber}`,
+      });
+    }
+    await billSubscription(sub.id, financeActor);
+    console.log(`  [FINANCE] Subscription ${sub.id} active with paid period 1 and scheduled period 2`);
+  }
+
+  // =========================================================================
+  // 4. OPERATIONS (Diego Ramos) FULFILLMENT SCENARIOS
+  // =========================================================================
+  // Ready to Fulfill: Approved quote awaiting operations allocation
+  const qReadyFulfill = await createQuotation({
+    salesRepId: mayaId,
+    customerId: apexId,
+    lines: [
+      { productId: beaconEdgeId, quantity: 10, unitPrice: 999, discountPercent: 5 },
+    ],
+  });
+  await submitQuotation(qReadyFulfill.id, salesRepActor);
+  console.log(`  [OPERATIONS] Ready for Fulfillment: ${qReadyFulfill.quotationNumber} in APPROVED (Apex Global)`);
+
+  // Backorder Scenario: High-volume order exceeding single warehouse stock
+  // 20 units of Cloud Sentinel Appliance requested (Cincinnati: 8, Reno: 6 = 14 total stock -> 6 backordered!)
+  const qBackorder = await createQuotation({
+    salesRepId: mayaId,
+    customerId: heliosId,
+    lines: [
+      { productId: sentinelId, quantity: 20, unitPrice: 3500, discountPercent: 0 },
+    ],
+  });
+  await submitQuotation(qBackorder.id, salesRepActor);
+  const fulfillmentBackorder = await createFulfillment(qBackorder.id, opsActor);
+  await allocateFulfillment(fulfillmentBackorder.id, opsActor);
+  console.log(`  [OPERATIONS] Backorder: ${qBackorder.quotationNumber} allocated across Cincy & Reno (6 backordered, Status: ${fulfillmentBackorder.status})`);
+
+  // Completed Fulfillment: Fully allocated, fulfilled and closed
+  const qCompletedFulfill = await createQuotation({
+    salesRepId: mayaId,
+    customerId: northwindId,
+    lines: [
+      { productId: beaconEdgeId, quantity: 2, unitPrice: 999, discountPercent: 5 },
+    ],
+  });
+  await submitQuotation(qCompletedFulfill.id, salesRepActor);
+  const fCompleted = await createFulfillment(qCompletedFulfill.id, opsActor);
+  await allocateFulfillment(fCompleted.id, opsActor);
+  await fulfillFulfillment(fCompleted.id, opsActor);
+  console.log(`  [OPERATIONS] Completed: ${qCompletedFulfill.quotationNumber} fulfilled and closed (Status: COMPLETED)`);
+
+  // =========================================================================
+  // 5. CUSTOMER (Jordan Lee) PORTAL & NEGOTIATION SCENARIOS
+  // =========================================================================
+  // Scenario 1: Quotation where Sales Rep countered, awaiting Customer review
+  const qCountered = await createQuotation({
+    salesRepId: mayaId,
+    customerId: northwindId,
+    lines: [
+      { productId: beaconEdgeId, quantity: 2, unitPrice: 999, discountPercent: 5 },
+    ],
+  });
+  await submitQuotation(qCountered.id, salesRepActor);
+  const negCountered = await submitCustomerNegotiation(qCountered.id, northwindId, jordanId, {
+    message: "We need 6 units for our logistics expansion. Could you offer 20% discount?",
+    targetTotal: 4800,
+    proposedLines: [
+      { productId: beaconEdgeId, requestedQuantity: 6, requestedDiscountPercent: 20 },
+    ],
+  });
+  await counterNegotiation(negCountered.id, salesRepActor, {
+    message: "We can commit to 6 units at a 12% commercial discount, plus include standard warranty.",
+  });
+  console.log(`  [CUSTOMER] Negotiation Awaiting Customer: ${qCountered.quotationNumber} (Maya Chen COUNTERED with 12% offer)`);
+
+  // Scenario 2: Quotation under initial negotiation review
+  const qUnderNegotiation = await createQuotation({
+    salesRepId: mayaId,
+    customerId: northwindId,
+    lines: [
+      { productId: migrationServiceId, quantity: 1, unitPrice: 8000, discountPercent: 10 },
+    ],
+  });
+  await submitQuotation(qUnderNegotiation.id, salesRepActor);
+  await submitCustomerNegotiation(qUnderNegotiation.id, northwindId, jordanId, {
+    message: "Can we bundle data migration with on-site deployment assistance at no extra charge?",
+    targetTotal: 7200,
+  });
+  console.log(`  [CUSTOMER] Under Negotiation: ${qUnderNegotiation.quotationNumber} (PENDING customer request)`);
+
+  // Scenario 3: Clean Approved Quotation ready for Customer to Accept
+  const qApprovedCustomer = await createQuotation({
+    salesRepId: mayaId,
+    customerId: northwindId,
+    lines: [
+      { productId: crmEnterpriseId, quantity: 2, unitPrice: 240, discountPercent: 10 },
+    ],
+  });
+  await submitQuotation(qApprovedCustomer.id, salesRepActor);
+  console.log(`  [CUSTOMER] Approved & Ready to Accept: ${qApprovedCustomer.quotationNumber} (Northwind Traders)`);
+
+  // Scenario 4: Customer Invoice (Issued historical invoice for Northwind)
+  const qCustomerBilled = await createQuotation({
+    salesRepId: mayaId,
+    customerId: northwindId,
+    lines: [
+      { productId: beaconEdgeId, quantity: 1, unitPrice: 999, discountPercent: 5 },
+    ],
+  });
+  await submitQuotation(qCustomerBilled.id, salesRepActor);
+  const billingCust = await createBillingFromQuotation(qCustomerBilled.id, financeActor);
+  if (billingCust.oneTimeInvoice) {
+    await issueInvoice(billingCust.oneTimeInvoice.id, financeActor);
+    console.log(`  [CUSTOMER] Invoice ${billingCust.oneTimeInvoice.invoiceNumber} ISSUED for Northwind Traders (visible in portal)`);
+  }
+
+  // =========================================================================
+  // 6. AGENTIC AI DEMO DEAL (Multi-step automation target)
+  // =========================================================================
+  const qAgentDemo = await createQuotation({
+    salesRepId: mayaId,
+    customerId: northwindId,
+    lines: [
+      { productId: beaconEdgeId, quantity: 4, unitPrice: 999, discountPercent: 25 },
+    ],
+  });
+  console.log(`  [COPILOT] Agent Automation Target: ${qAgentDemo.quotationNumber} in DRAFT (25% discount -> test 'Prepare for approval')`);
+
+  console.log("\n==========================================================");
+  console.log("Realistic Demo Data Generation Complete!");
+  console.log("==========================================================");
+  console.log("Demo Credentials (Password: DealFlow360! for all accounts):");
+  console.log("  • ADMIN         : avery.stone@dealflow360.io");
+  console.log("  • SALES_REP     : maya.chen@dealflow360.io");
+  console.log("  • SALES_MANAGER : ravi.patel@dealflow360.io");
+  console.log("  • FINANCE       : priya.nair@dealflow360.io");
+  console.log("  • OPERATIONS    : diego.ramos@dealflow360.io");
+  console.log("  • CUSTOMER      : jordan.lee@dealflow360.io");
+  console.log("==========================================================\n");
 }
 
 main()

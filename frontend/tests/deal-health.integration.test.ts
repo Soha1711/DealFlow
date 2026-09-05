@@ -66,7 +66,9 @@ before(async () => {
   }
   customerId = customer.id;
 
-  const prod = await db.product.findFirstOrThrow({ where: { isRecurring: false } });
+  const prod =
+    (await db.product.findFirst({ where: { sku: "EDGE-DEV-021" } })) ??
+    (await db.product.findFirstOrThrow({ where: { isRecurring: false }, orderBy: { sku: "asc" } }));
   product = {
     id: prod.id,
     price: Number(prod.price),
