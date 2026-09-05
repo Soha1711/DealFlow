@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { requireAreaAccess } from "@/lib/auth-guards";
 import { listWarehouses } from "@/lib/modules/catalog/catalog-service";
+import { InventoryAdjust } from "@/components/fulfillment/inventory-adjust";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { InfoBanner } from "@/components/layout/info-banner";
@@ -20,13 +21,20 @@ export default async function AdminWarehousesPage() {
   await requireAreaAccess("admin-warehouses");
   const warehouses = await listWarehouses();
 
-  const inventoryTotals = (warehouseId: string) => {
-    const lines = warehouses.find((w) => w.id === warehouseId)?.inventory ?? [];
-    return {
-      skuCount: lines.length,
-      onHand: lines.reduce((sum, line) => sum + line.quantity, 0),
-      reserved: lines.reduce((sum, line) => sum + line.reservedQuantity, 0),
-    };
+  const inventoryRows = warehouses.flatMap((warehouse) =>
+    warehouse.inventory.map((line) => ({
+      id: line.id,
+      productName: line.product.name,
+      warehouseName: warehouse.name,
+      warehouseLocation: warehouse.location,
+      quantity: line.quantity,
+      reservedQuantity: line.reservedQuantity,
+    }))
+  );
+
+  const totals = {
+    onHand: inventoryRows.reduce((sum, row) => sum + row.quantity, 0),
+    reserved: inventoryRows.reduce((sum, row) => sum + row.reservedQuantity, 0),
   };
 
   return (
@@ -37,50 +45,80 @@ export default async function AdminWarehousesPage() {
       />
       <div className="mb-6">
         <InfoBanner
-          title="Read-only in Phase 1"
-          description="Warehouse and inventory management is implemented in a later phase."
+          title="Inventory adjustments (Phase 5)"
+          description="Adjust stock levels to replenish inventory and release backorders. Adjustments are transactional and guarded against negative stock."
         />
       </div>
 
-      {warehouses.length === 0 ? (
-        <EmptyState description="No warehouses have been seeded yet." />
+      {inventoryRows.length === 0 ? (
+        <EmptyState description="No inventory has been seeded yet." />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-white">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow className="hover:bg-muted/50">
-                <TableHead>Warehouse</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead className="text-right">SKUs in stock</TableHead>
-                <TableHead className="text-right">On-hand units</TableHead>
-                <TableHead className="text-right">Reserved</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {warehouses.map((warehouse) => {
-                const totals = inventoryTotals(warehouse.id);
-                return (
-                  <TableRow key={warehouse.id} className="hover:bg-muted/30">
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm">
+            <span className="text-muted-foreground">
+              Warehouses:{" "}
+              <span className="font-medium text-foreground">{warehouses.length}</span>
+            </span>
+            <span className="text-muted-foreground">
+              On-hand units:{" "}
+              <span className="font-medium text-foreground">
+                {totals.onHand.toLocaleString()}
+              </span>
+            </span>
+            <span className="text-muted-foreground">
+              Reserved:{" "}
+              <span className="font-medium text-foreground">
+                {totals.reserved.toLocaleString()}
+              </span>
+            </span>
+            <span className="text-muted-foreground">
+              Available:{" "}
+              <span className="font-medium text-foreground">
+                {(totals.onHand - totals.reserved).toLocaleString()}
+              </span>
+            </span>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-border bg-white">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow className="hover:bg-muted/50">
+                  <TableHead>Product</TableHead>
+                  <TableHead>Warehouse</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead className="text-right">On hand</TableHead>
+                  <TableHead className="text-right">Reserved</TableHead>
+                  <TableHead className="text-right">Available</TableHead>
+                  <TableHead className="text-right">Adjust</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {inventoryRows.map((row) => (
+                  <TableRow key={row.id} className="hover:bg-muted/30">
                     <TableCell className="font-medium text-foreground">
-                      {warehouse.name}
+                      {row.productName}
                     </TableCell>
+                    <TableCell>{row.warehouseName}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {warehouse.location}
+                      {row.warehouseLocation}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {totals.skuCount}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {totals.onHand.toLocaleString()}
+                      {row.quantity.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {totals.reserved.toLocaleString()}
+                      {row.reservedQuantity.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {(row.quantity - row.reservedQuantity).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <InventoryAdjust inventoryId={row.id} />
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
     </>

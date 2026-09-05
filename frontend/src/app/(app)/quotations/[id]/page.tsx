@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FilePenLine } from "lucide-react";
+import { ArrowUpRight, FilePenLine } from "lucide-react";
 
 import { requireAreaAccess } from "@/lib/auth-guards";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -12,6 +12,7 @@ import {
 } from "@/lib/modules/quotations/guards";
 import { getQuotation } from "@/lib/modules/quotations/quotation-service";
 import { listApprovalsForQuotation } from "@/lib/modules/approvals/approval-service";
+import { getFulfillmentForQuotation } from "@/lib/modules/fulfillment/fulfillment-service";
 import { ApprovalStageList, buildApprovalStages } from "@/components/approvals/approval-stage-list";
 import { RiskLevelBadge } from "@/components/approvals/risk-badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { RecommendationsPanel } from "@/components/recommendations/recommendations-panel";
 import { QuotationStatusBadge } from "@/components/quotations/status-badge";
 import { SubmitQuotationButton } from "@/components/quotations/submit-quotation-button";
+import { FulfillmentStatusBadge } from "@/components/fulfillment/fulfillment-status-badge";
+import { StartFulfillmentButton } from "@/components/fulfillment/start-fulfillment-button";
 
 export const metadata: Metadata = { title: "Quotation" };
 
@@ -80,6 +83,11 @@ export default async function QuotationDetailPage({
     approvals,
     Object.fromEntries(approverNames)
   );
+
+  const fulfillment = await getFulfillmentForQuotation(quotation.id, {
+    role: user.role,
+    userId: user.id,
+  }).catch(() => null);
 
   return (
     <>
@@ -276,6 +284,44 @@ export default async function QuotationDetailPage({
               </dl>
             </CardContent>
           </Card>
+
+          {fulfillment ? (
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Fulfillment</CardTitle>
+                <CardDescription>
+                  Warehouse allocation progress for this quotation.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between text-sm">
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd>
+                    <FulfillmentStatusBadge status={fulfillment.status} />
+                  </dd>
+                </div>
+                <Button asChild variant="outline" size="sm" className="mt-3 w-full">
+                  <Link href={`/fulfillment/${fulfillment.id}`}>
+                    View fulfillment
+                    <ArrowUpRight className="size-4" aria-hidden />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : quotation.status === "APPROVED" &&
+            (user.role === "ADMIN" || user.role === "OPERATIONS") ? (
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Fulfillment</CardTitle>
+                <CardDescription>
+                  This quotation is approved and ready to be fulfilled.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <StartFulfillmentButton quotationId={quotation.id} />
+              </CardContent>
+            </Card>
+          ) : null}
 
           {(quotation.riskScore !== null || quotation.riskLevel !== null) && (
             <Card className="bg-white">

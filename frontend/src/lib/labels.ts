@@ -5,6 +5,9 @@ import type {
   CustomerTier,
   DiscountApprovalLevel,
   DiscountRiskLevel,
+  FulfillmentAllocationStatus,
+  FulfillmentLineStatus,
+  FulfillmentStatus,
   QuotationStatus,
 } from "@prisma/client";
 
@@ -88,4 +91,54 @@ export const DISCOUNT_RISK_BADGE_CLASSES: Record<DiscountRiskLevel, string> = {
   MEDIUM: "bg-blue-50 text-blue-700 hover:bg-blue-50",
   HIGH: "bg-amber-50 text-amber-700 hover:bg-amber-50",
   CRITICAL: "bg-red-50 text-red-700 hover:bg-red-50",
+};
+
+export const FULFILLMENT_STATUS_LABELS: Record<FulfillmentStatus, string> = {
+  PENDING_ALLOCATION: "Pending allocation",
+  ALLOCATED: "Allocated",
+  PARTIALLY_ALLOCATED: "Partially allocated",
+  PARTIALLY_FULFILLED: "Partially fulfilled",
+  FULFILLED: "Fulfilled",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+};
+
+export const FULFILLMENT_STATUS_BADGE_CLASSES: Record<FulfillmentStatus, string> = {
+  PENDING_ALLOCATION: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+  ALLOCATED: "bg-blue-50 text-blue-700 hover:bg-blue-50",
+  PARTIALLY_ALLOCATED: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  PARTIALLY_FULFILLED: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  FULFILLED: "bg-blue-50 text-blue-700 hover:bg-blue-50",
+  COMPLETED: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  CANCELLED: "bg-red-50 text-red-700 hover:bg-red-50",
+};
+
+export const FULFILLMENT_LINE_STATUS_LABELS: Record<FulfillmentLineStatus, string> = {
+  REQUESTED: "Requested",
+  ALLOCATED: "Allocated",
+  PARTIALLY_FULFILLED: "Partially fulfilled",
+  FULFILLED: "Fulfilled",
+  BACKORDERED: "Backordered",
+  CANCELLED: "Cancelled",
+};
+
+export const FULFILLMENT_LINE_STATUS_BADGE_CLASSES: Record<FulfillmentLineStatus, string> = {
+  REQUESTED: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+  ALLOCATED: "bg-blue-50 text-blue-700 hover:bg-blue-50",
+  PARTIALLY_FULFILLED: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  FULFILLED: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  BACKORDERED: "bg-red-50 text-red-700 hover:bg-red-50",
+  CANCELLED: "bg-red-50 text-red-700 hover:bg-red-50",
+};
+
+export const FULFILLMENT_ALLOCATION_STATUS_LABELS: Record<FulfillmentAllocationStatus, string> = {
+  ALLOCATED: "Allocated",
+  FULFILLED: "Fulfilled",
+  RELEASED: "Released",
+};
+
+export const FULFILLMENT_ALLOCATION_STATUS_BADGE_CLASSES: Record<FulfillmentAllocationStatus, string> = {
+  ALLOCATED: "bg-blue-50 text-blue-700 hover:bg-blue-50",
+  FULFILLED: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  RELEASED: "bg-slate-100 text-slate-700 hover:bg-slate-100",
 };

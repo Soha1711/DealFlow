@@ -317,6 +317,37 @@ async function main() {
   }
   console.log(`  inventory: ${seedInventory.length} records upserted`);
 
+  // -------------------------------------------------------------------------
+  // Reservation-ledger reconciliation (Phase 5)
+  // -------------------------------------------------------------------------
+  // The Phase 1 seed set non-zero reservedQuantity values before the
+  // InventoryReservation ledger existed. To make reserved inventory auditable
+  // without changing effective availability (quantity − reservedQuantity), we
+  // back each legacy reserved counter with an ACTIVE reservation ledger row
+  // (not tied to any allocation) when none exists. This is deterministic and
+  // idempotent: re-running the seed never double-books.
+  const legacyReserved = await prisma.inventory.findMany({
+    where: { reservedQuantity: { gt: 0 } },
+    select: { id: true, reservedQuantity: true },
+  });
+  for (const row of legacyReserved) {
+    const hasLedger = await prisma.inventoryReservation.count({
+      where: { inventoryId: row.id, status: "ACTIVE" },
+    });
+    if (hasLedger === 0) {
+      await prisma.inventoryReservation.create({
+        data: {
+          inventoryId: row.id,
+          quantity: row.reservedQuantity,
+          status: "ACTIVE",
+        },
+      });
+      console.log(
+        `  reservation: backfilled ${row.reservedQuantity} units for inventory ${row.id}`
+      );
+    }
+  }
+
   console.log("Seed complete.");
   console.log("");
   console.log(`Demo password for all seeded users: ${DEMO_PASSWORD}`);
