@@ -10,7 +10,9 @@ import {
 import {
   acceptNegotiation,
   counterNegotiation,
+  customerAcceptCounter,
   customerAcceptQuotation,
+  customerRejectCounter,
   customerRespondToCounter,
   getCustomerQuotation,
   listCustomerQuotations,
@@ -329,5 +331,128 @@ describe("Phase 7: Customer Portal & Negotiation Integration", () => {
       customerUser.id
     );
     assert.equal(customerConfirmed.status, "CONFIRMED");
+  });
+
+  it("allows customer to accept sales counter-offer, transitioning quotation to CONFIRMED", async () => {
+    const quote = await createApprovedTestQuote(customer1Id);
+    const neg = await submitCustomerNegotiation(
+      quote.id,
+      customer1Id,
+      customerUser.id,
+      { message: "Can we get 20% discount on volume?" }
+    );
+
+    // Sales counters
+    await counterNegotiation(neg.id, rep, {
+      message: "We can only do 12% discount.",
+    });
+
+    // Customer 2 tries to accept Customer 1's counter-offer -> IDOR 404 blocked
+    await assert.rejects(
+      async () => {
+        await customerAcceptCounter(neg.id, customer2Id, "other-user", {
+          message: "Malicious customer trying to accept",
+        });
+      },
+      (err: unknown) => err instanceof NegotiationError && err.status === 404
+    );
+
+    // Customer 1 accepts the counter-offer
+    const confirmedQuote = await customerAcceptCounter(
+      neg.id,
+      customer1Id,
+      customerUser.id,
+      { message: "Accepted 12% discount. Thank you!" }
+    );
+
+    assert.equal(confirmedQuote.status, "CONFIRMED");
+
+    // Verify negotiation in database is ACCEPTED
+    const dbNeg = await db.quotationNegotiation.findUniqueOrThrow({ where: { id: neg.id } });
+    assert.equal(dbNeg.status, "ACCEPTED");
+    assert.match(dbNeg.responseMessage ?? "", /\[Customer Accepted\]: Accepted 12% discount/);
+
+    // Concurrency / state guard: trying to accept again fails with conflict (409)
+    await assert.rejects(
+      async () => {
+        await customerAcceptCounter(neg.id, customer1Id, customerUser.id);
+      },
+      (err: unknown) => err instanceof NegotiationError && err.status === 409
+    );
+  });
+
+  it("allows customer to reject sales counter-offer, restoring quotation to APPROVED", async () => {
+    const quote = await createApprovedTestQuote(customer1Id);
+    const neg = await submitCustomerNegotiation(
+      quote.id,
+      customer1Id,
+      customerUser.id,
+      { message: "Can we split shipping costs?" }
+    );
+
+    // Sales counters
+    await counterNegotiation(neg.id, rep, {
+      message: "Shipping is standard non-negotiable.",
+    });
+
+    // Customer 2 tries to reject Customer 1's counter-offer -> IDOR 404 blocked
+    await assert.rejects(
+      async () => {
+        await customerRejectCounter(neg.id, customer2Id, "other-user", {
+          reason: "Malicious reject",
+        });
+      },
+      (err: unknown) => err instanceof NegotiationError && err.status === 404
+    );
+
+    // Customer 1 rejects the counter-offer
+    const restoredQuote = await customerRejectCounter(
+      neg.id,
+      customer1Id,
+      customerUser.id,
+      { reason: "We will stick with the original terms instead." }
+    );
+
+    assert.equal(restoredQuote.status, "APPROVED");
+
+    // Verify negotiation in database is REJECTED
+    const dbNeg = await db.quotationNegotiation.findUniqueOrThrow({ where: { id: neg.id } });
+    assert.equal(dbNeg.status, "REJECTED");
+    assert.match(dbNeg.responseMessage ?? "", /\[Customer Declined\]/);
+
+    // Customer can now accept the restored quotation as-is
+    const confirmedQuote = await customerAcceptQuotation(
+      quote.id,
+      customer1Id,
+      customerUser.id
+    );
+    assert.equal(confirmedQuote.status, "CONFIRMED");
+  });
+
+  it("includes latest negotiation status in customer portal quotation list", async () => {
+    const quote = await createApprovedTestQuote(customer1Id);
+    const neg = await submitCustomerNegotiation(
+      quote.id,
+      customer1Id,
+      customerUser.id,
+      { message: "Checking list display for counter-offers" }
+    );
+
+    // Sales counters
+    await counterNegotiation(neg.id, rep, {
+      message: "Counter-offer for list test",
+    });
+
+    const listResult = await listCustomerQuotations(customer1Id, {
+      page: 1,
+      pageSize: 20,
+    });
+
+    const matchedQuote = listResult.data.find((q) => q.id === quote.id);
+    assert.ok(matchedQuote);
+    assert.equal(matchedQuote.status, "UNDER_NEGOTIATION");
+    assert.equal(matchedQuote.negotiations?.length, 1);
+    assert.equal(matchedQuote.negotiations[0].status, "COUNTERED");
+    assert.equal(matchedQuote.negotiations[0].responseMessage, "Counter-offer for list test");
   });
 });

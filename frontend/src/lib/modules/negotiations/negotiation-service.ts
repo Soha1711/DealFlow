@@ -20,6 +20,8 @@ import {
 import type {
   AcceptNegotiationInput,
   CounterNegotiationInput,
+  CustomerAcceptCounterInput,
+  CustomerRejectCounterInput,
   ListPortalQuotationsQuery,
   RejectNegotiationInput,
   RespondNegotiationInput,
@@ -111,6 +113,18 @@ export async function listCustomerQuotations(
       customer: { select: { id: true, name: true, email: true, tier: true } },
       salesRep: { select: { id: true, name: true, email: true } },
       _count: { select: { lines: true } },
+      negotiations: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          id: true,
+          status: true,
+          message: true,
+          responseMessage: true,
+          createdAt: true,
+          actedAt: true,
+        },
+      },
     },
   });
 
@@ -305,6 +319,132 @@ export async function customerRespondToCounter(
     return updated;
   });
 }
+
+/**
+ * Customer accepts a sales representative's counter-offer.
+ * Updates the negotiation to ACCEPTED and confirms the quotation (CONFIRMED).
+ */
+export async function customerAcceptCounter(
+  negotiationId: string,
+  customerId: string,
+  userId: string,
+  input?: CustomerAcceptCounterInput
+) {
+  return db.$transaction(async (tx) => {
+    const negotiation = await tx.quotationNegotiation.findUnique({
+      where: { id: negotiationId },
+      include: {
+        quotation: {
+          select: { id: true, customerId: true, status: true },
+        },
+      },
+    });
+
+    if (
+      !negotiation ||
+      negotiation.customerId !== customerId ||
+      negotiation.quotation.customerId !== customerId
+    ) {
+      throw notFound("Negotiation not found.");
+    }
+
+    const transition = resolveNegotiationStatusTransition(
+      negotiation.status,
+      "accept"
+    );
+    if (!transition.ok) {
+      throw conflict(transition.message);
+    }
+
+    const claimed = await tx.quotationNegotiation.updateMany({
+      where: { id: negotiationId, status: "COUNTERED" },
+      data: {
+        status: "ACCEPTED",
+        responseMessage: input?.message
+          ? `${negotiation.responseMessage ? negotiation.responseMessage + "\n\n" : ""}[Customer Accepted]: ${input.message}`
+          : negotiation.responseMessage,
+        actedById: userId,
+        actedAt: new Date(),
+      },
+    });
+
+    if (claimed.count === 0) {
+      throw conflict("Negotiation was already updated by another action.");
+    }
+
+    const updatedQuotation = await tx.quotation.update({
+      where: { id: negotiation.quotationId },
+      data: { status: "CONFIRMED" },
+      include: portalQuotationInclude,
+    });
+
+    return sanitizeQuotationForCustomer(updatedQuotation);
+  });
+}
+
+/**
+ * Customer declines / rejects a sales representative's counter-offer.
+ * Updates the negotiation to REJECTED and reverts the quotation to APPROVED
+ * so the customer can accept the original quotation or start fresh.
+ */
+export async function customerRejectCounter(
+  negotiationId: string,
+  customerId: string,
+  userId: string,
+  input?: CustomerRejectCounterInput
+) {
+  return db.$transaction(async (tx) => {
+    const negotiation = await tx.quotationNegotiation.findUnique({
+      where: { id: negotiationId },
+      include: {
+        quotation: {
+          select: { id: true, customerId: true, status: true },
+        },
+      },
+    });
+
+    if (
+      !negotiation ||
+      negotiation.customerId !== customerId ||
+      negotiation.quotation.customerId !== customerId
+    ) {
+      throw notFound("Negotiation not found.");
+    }
+
+    const transition = resolveNegotiationStatusTransition(
+      negotiation.status,
+      "reject"
+    );
+    if (!transition.ok) {
+      throw conflict(transition.message);
+    }
+
+    const claimed = await tx.quotationNegotiation.updateMany({
+      where: { id: negotiationId, status: "COUNTERED" },
+      data: {
+        status: "REJECTED",
+        responseMessage: input?.reason
+          ? `${negotiation.responseMessage ? negotiation.responseMessage + "\n\n" : ""}[Customer Declined]: ${input.reason}`
+          : negotiation.responseMessage,
+        actedById: userId,
+        actedAt: new Date(),
+      },
+    });
+
+    if (claimed.count === 0) {
+      throw conflict("Negotiation was already updated by another action.");
+    }
+
+    const updatedQuotation = await tx.quotation.update({
+      where: { id: negotiation.quotationId },
+      data: { status: "APPROVED" },
+      include: portalQuotationInclude,
+    });
+
+    return sanitizeQuotationForCustomer(updatedQuotation);
+  });
+}
+
 
 export type SalesActor = {
   userId: string;

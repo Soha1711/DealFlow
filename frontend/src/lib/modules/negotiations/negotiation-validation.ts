@@ -76,6 +76,18 @@ export const acceptNegotiationSchema = z.object({
 
 export type AcceptNegotiationInput = z.infer<typeof acceptNegotiationSchema>;
 
+export const customerAcceptCounterSchema = z.object({
+  message: z.string().trim().max(500, "Message cannot exceed 500 characters").optional(),
+});
+
+export type CustomerAcceptCounterInput = z.infer<typeof customerAcceptCounterSchema>;
+
+export const customerRejectCounterSchema = z.object({
+  reason: z.string().trim().max(500, "Reason cannot exceed 500 characters").optional(),
+});
+
+export type CustomerRejectCounterInput = z.infer<typeof customerRejectCounterSchema>;
+
 export const listPortalQuotationsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(10),
@@ -86,3 +98,4 @@ export const listPortalQuotationsQuerySchema = z.object({
 });
 
 export type ListPortalQuotationsQuery = z.infer<typeof listPortalQuotationsQuerySchema>;
+

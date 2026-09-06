@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Building2, TriangleAlert } from "lucide-react";
+import { ArrowRight, Building2, MessageSquareQuote, TriangleAlert } from "lucide-react";
 
 import { requireAreaAccess } from "@/lib/auth-guards";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -88,6 +88,12 @@ export default async function CustomerPortalPage({
 
   const { data } = result;
 
+  const counterOfferedQuotations = data.filter(
+    (q) =>
+      q.status === "UNDER_NEGOTIATION" &&
+      q.negotiations?.[0]?.status === "COUNTERED"
+  );
+
   return (
     <>
       <PageHeader
@@ -98,6 +104,22 @@ export default async function CustomerPortalPage({
           Customer Portal
         </Badge>
       </PageHeader>
+
+      {counterOfferedQuotations.length > 0 && (
+        <div className="mb-6">
+          <Alert className="border-amber-300 bg-amber-50 text-amber-900 shadow-2xs">
+            <MessageSquareQuote className="size-4 text-amber-600" />
+            <AlertTitle className="font-semibold text-amber-950">
+              Counter-Offer Received
+            </AlertTitle>
+            <AlertDescription className="text-amber-800 text-xs mt-1">
+              You have received counter-offers on {counterOfferedQuotations.length}{" "}
+              {counterOfferedQuotations.length === 1 ? "quotation" : "quotations"}{" "}
+              from your sales representative. Please review the updated terms to accept, decline, or reply.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
 
       {data.length === 0 ? (
         <EmptyState
@@ -119,42 +141,78 @@ export default async function CustomerPortalPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((q) => (
-                <TableRow key={q.id} className="hover:bg-muted/30">
-                  <TableCell>
-                    <Link
-                      href={`/portal/quotations/${q.id}`}
-                      className="font-medium text-blue-700 hover:underline"
-                    >
-                      {q.quotationNumber}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {q.salesRep.name}
-                  </TableCell>
-                  <TableCell>
-                    <QuotationStatusBadge status={q.status} />
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {formatCurrency(q.total)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {q.validUntil ? formatDate(q.validUntil) : "No expiration"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {formatDate(q.createdAt)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Link
-                      href={`/portal/quotations/${q.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:underline"
-                    >
-                      View
-                      <ArrowRight className="size-3" />
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {data.map((q) => {
+                const latestNegotiation = q.negotiations?.[0];
+                return (
+                  <TableRow key={q.id} className="hover:bg-muted/30">
+                    <TableCell>
+                      <Link
+                        href={`/portal/quotations/${q.id}`}
+                        className="font-medium text-blue-700 hover:underline"
+                      >
+                        {q.quotationNumber}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {q.salesRep.name}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col items-start gap-1">
+                        <QuotationStatusBadge status={q.status} />
+                        {q.status === "UNDER_NEGOTIATION" &&
+                          latestNegotiation?.status === "COUNTERED" && (
+                            <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-[10px] px-1.5 py-0 font-normal">
+                              Counter-Offer Received
+                            </Badge>
+                          )}
+                        {q.status === "UNDER_NEGOTIATION" &&
+                          latestNegotiation?.status === "PENDING" && (
+                            <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px] px-1.5 py-0 font-normal">
+                              Awaiting Sales Review
+                            </Badge>
+                          )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatCurrency(q.total)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {q.validUntil ? formatDate(q.validUntil) : "No expiration"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {formatDate(q.createdAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {q.status === "UNDER_NEGOTIATION" &&
+                      latestNegotiation?.status === "COUNTERED" ? (
+                        <Link
+                          href={`/portal/quotations/${q.id}`}
+                          className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 text-xs font-medium text-white shadow-xs hover:bg-amber-700"
+                        >
+                          Review Counter
+                          <ArrowRight className="size-3" />
+                        </Link>
+                      ) : q.status === "APPROVED" ? (
+                        <Link
+                          href={`/portal/quotations/${q.id}`}
+                          className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white shadow-xs hover:bg-emerald-700"
+                        >
+                          Review & Accept
+                          <ArrowRight className="size-3" />
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/portal/quotations/${q.id}`}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:underline"
+                        >
+                          View
+                          <ArrowRight className="size-3" />
+                        </Link>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

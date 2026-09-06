@@ -16,10 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { InfoBanner } from "@/components/layout/info-banner";
 import { PageHeader } from "@/components/layout/page-header";
 import { QuotationStatusBadge } from "@/components/quotations/status-badge";
 import { AcceptQuoteButton } from "@/components/portal/accept-quote-button";
+import { CustomerNegotiationPanel } from "@/components/portal/customer-negotiation-panel";
 import { NegotiateDialog, type QuotationLineItem } from "@/components/portal/negotiate-dialog";
 import { NegotiationTimeline, type NegotiationItem } from "@/components/portal/negotiation-timeline";
 
@@ -50,6 +52,30 @@ export default async function CustomerQuotationDetailPage({
 
   const lines = quotation.lines ?? [];
   const negotiations = quotation.negotiations ?? [];
+
+  const activeNegotiation =
+    negotiations.find(
+      (n) => n.status === "COUNTERED" || n.status === "PENDING"
+    ) ?? (negotiations.length > 0 ? negotiations[negotiations.length - 1] : null);
+
+  const serializedActiveNegotiation =
+    activeNegotiation &&
+    (activeNegotiation.status === "COUNTERED" || activeNegotiation.status === "PENDING")
+      ? {
+          id: activeNegotiation.id,
+          status: activeNegotiation.status,
+          message: activeNegotiation.message,
+          responseMessage: activeNegotiation.responseMessage,
+          createdAt: activeNegotiation.createdAt.toISOString(),
+          actedAt: activeNegotiation.actedAt ? activeNegotiation.actedAt.toISOString() : null,
+          createdBy: activeNegotiation.createdBy
+            ? { name: activeNegotiation.createdBy.name, email: activeNegotiation.createdBy.email }
+            : undefined,
+          actedBy: activeNegotiation.actedBy
+            ? { name: activeNegotiation.actedBy.name, email: activeNegotiation.actedBy.email }
+            : null,
+        }
+      : null;
 
   const dialogLines: QuotationLineItem[] = lines.map((line) => ({
     id: line.id,
@@ -95,6 +121,18 @@ export default async function CustomerQuotationDetailPage({
       >
         <div className="flex items-center gap-3">
           <QuotationStatusBadge status={quotation.status} />
+          {quotation.status === "UNDER_NEGOTIATION" &&
+            serializedActiveNegotiation?.status === "COUNTERED" && (
+              <Badge className="bg-amber-100 text-amber-900 border-amber-300">
+                Counter-Offer Received
+              </Badge>
+            )}
+          {quotation.status === "UNDER_NEGOTIATION" &&
+            serializedActiveNegotiation?.status === "PENDING" && (
+              <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                Awaiting Sales Review
+              </Badge>
+            )}
           {quotation.status === "APPROVED" && (
             <>
               <NegotiateDialog quotationId={quotation.id} lines={dialogLines} />
@@ -104,14 +142,12 @@ export default async function CustomerQuotationDetailPage({
         </div>
       </PageHeader>
 
-      {quotation.status === "UNDER_NEGOTIATION" && (
-        <div className="mb-6">
-          <InfoBanner
-            title="Quotation is Under Negotiation"
-            description="Your change request is currently under review by your sales representative. You will be notified when they update terms or respond."
-          />
-        </div>
-      )}
+      <CustomerNegotiationPanel
+        quotationId={quotation.id}
+        quotationStatus={quotation.status}
+        activeNegotiation={serializedActiveNegotiation}
+        salesRepName={quotation.salesRep?.name}
+      />
 
       {quotation.status === "CONFIRMED" && (
         <div className="mb-6">

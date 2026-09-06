@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import {
   acceptNegotiationSchema,
   counterNegotiationSchema,
+  customerAcceptCounterSchema,
+  customerRejectCounterSchema,
   rejectNegotiationSchema,
   respondNegotiationSchema,
   submitNegotiationSchema,
@@ -124,5 +126,43 @@ describe("acceptNegotiationSchema", () => {
       ],
     });
     assert.equal(parsed2.success, true);
+  });
+});
+
+describe("customerAcceptCounterSchema", () => {
+  it("accepts empty or valid message", () => {
+    const parsedEmpty = customerAcceptCounterSchema.safeParse({});
+    assert.equal(parsedEmpty.success, true);
+
+    const parsedWithMsg = customerAcceptCounterSchema.safeParse({
+      message: "We accept the updated discount.",
+    });
+    assert.equal(parsedWithMsg.success, true);
+  });
+
+  it("rejects message exceeding 500 characters", () => {
+    const parsedTooLong = customerAcceptCounterSchema.safeParse({
+      message: "A".repeat(501),
+    });
+    assert.equal(parsedTooLong.success, false);
+  });
+});
+
+describe("customerRejectCounterSchema", () => {
+  it("accepts empty or valid reason", () => {
+    const parsedEmpty = customerRejectCounterSchema.safeParse({});
+    assert.equal(parsedEmpty.success, true);
+
+    const parsedWithReason = customerRejectCounterSchema.safeParse({
+      reason: "Pricing does not meet our required threshold.",
+    });
+    assert.equal(parsedWithReason.success, true);
+  });
+
+  it("rejects reason exceeding 500 characters", () => {
+    const parsedTooLong = customerRejectCounterSchema.safeParse({
+      reason: "B".repeat(501),
+    });
+    assert.equal(parsedTooLong.success, false);
   });
 });
