@@ -1,10 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { Prisma } from "@prisma/client";
+
 import {
   canCustomerAccessQuotation,
   canSalesRepActOnNegotiation,
   sanitizeQuotationForCustomer,
+  serializeNegotiationLines,
+  serializeNegotiations,
 } from "../src/lib/modules/negotiations/negotiation-guards.ts";
 
 describe("canCustomerAccessQuotation", () => {
@@ -177,3 +181,114 @@ describe("sanitizeQuotationForCustomer", () => {
     assert.equal("maxDiscountPercent" in sanitized.lines[0].product, false);
   });
 });
+
+describe("serializeNegotiationLines", () => {
+  it("serializes Prisma Decimal fields to plain strings and preserves line data", () => {
+    const rawLines = [
+      {
+        id: "line-1",
+        productId: "prod-1",
+        quantity: 3,
+        unitPrice: new Prisma.Decimal("125.50"),
+        discountPercent: 10,
+        product: {
+          id: "prod-1",
+          name: "Acme Widget",
+          sku: "WIDGET-01",
+          price: new Prisma.Decimal("150.00"),
+        },
+      },
+    ];
+
+    const serialized = serializeNegotiationLines(rawLines);
+
+    assert.equal(serialized.length, 1);
+    assert.equal(serialized[0].id, "line-1");
+    assert.equal(serialized[0].productId, "prod-1");
+    assert.equal(serialized[0].quantity, 3);
+    assert.equal(serialized[0].discountPercent, 10);
+    assert.equal(typeof serialized[0].unitPrice, "string");
+    assert.equal(serialized[0].unitPrice, "125.5");
+    assert.equal(serialized[0].product.name, "Acme Widget");
+    assert.equal(typeof serialized[0].product.price, "string");
+    assert.equal(serialized[0].product.price, "150");
+
+    // Must be plain primitive strings (safe for Server -> Client boundary)
+    assert.equal(typeof serialized[0].unitPrice, "string");
+    assert.equal(typeof serialized[0].product.price, "string");
+
+    // Deep JSON serializability check
+    assert.deepEqual(JSON.parse(JSON.stringify(serialized)), serialized);
+  });
+
+  it("handles number and string unit prices safely", () => {
+    const rawLines = [
+      {
+        id: "line-2",
+        productId: "prod-2",
+        quantity: 1,
+        unitPrice: 99.99,
+        discountPercent: 0,
+        product: {
+          id: "prod-2",
+          name: "Gadget",
+          sku: "GAD-02",
+          price: "99.99",
+        },
+      },
+    ];
+
+    const serialized = serializeNegotiationLines(rawLines);
+    assert.equal(serialized[0].unitPrice, "99.99");
+    assert.equal(serialized[0].product.price, "99.99");
+  });
+});
+
+describe("serializeNegotiations", () => {
+  it("serializes Date instances to ISO strings for client boundary safety", () => {
+    const createdDate = new Date("2026-03-01T12:00:00.000Z");
+    const actedDate = new Date("2026-03-02T15:30:00.000Z");
+
+    const rawNegotiations = [
+      {
+        id: "neg-1",
+        status: "PENDING" as const,
+        message: "Can we get 15% discount?",
+        proposedChanges: { targetTotal: 1000 },
+        responseMessage: null,
+        createdAt: createdDate,
+        actedAt: null,
+        createdBy: { name: "Alice Customer", email: "alice@customer.com" },
+        actedBy: null,
+      },
+      {
+        id: "neg-2",
+        status: "COUNTERED" as const,
+        message: "Earlier round",
+        proposedChanges: null,
+        responseMessage: "How about 10%?",
+        createdAt: createdDate,
+        actedAt: actedDate,
+        createdBy: { name: "Alice Customer", email: "alice@customer.com" },
+        actedBy: { name: "Bob SalesRep", email: "bob@dealflow.com" },
+      },
+    ];
+
+    const serialized = serializeNegotiations(rawNegotiations);
+
+    assert.equal(serialized.length, 2);
+
+    // Date objects converted to primitive ISO strings
+    assert.equal(typeof serialized[0].createdAt, "string");
+    assert.equal(serialized[0].createdAt, "2026-03-01T12:00:00.000Z");
+    assert.equal(serialized[0].actedAt, null);
+
+    assert.equal(typeof serialized[1].createdAt, "string");
+    assert.equal(typeof serialized[1].actedAt, "string");
+    assert.equal(serialized[1].actedAt, "2026-03-02T15:30:00.000Z");
+
+    // Deep JSON serializability check
+    assert.deepEqual(JSON.parse(JSON.stringify(serialized)), serialized);
+  });
+});
+

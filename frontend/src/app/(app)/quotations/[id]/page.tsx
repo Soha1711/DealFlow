@@ -16,7 +16,11 @@ import { getFulfillmentForQuotation } from "@/lib/modules/fulfillment/fulfillmen
 import { getBillingForQuotation } from "@/lib/modules/billing/billing-service";
 import { canManageBilling } from "@/lib/modules/billing/billing-guards";
 import { listNegotiationsForQuotation } from "@/lib/modules/negotiations/negotiation-service";
-import { canSalesRepActOnNegotiation } from "@/lib/modules/negotiations/negotiation-guards";
+import {
+  canSalesRepActOnNegotiation,
+  serializeNegotiationLines,
+  serializeNegotiations,
+} from "@/lib/modules/negotiations/negotiation-guards";
 import { getDealHealth } from "@/lib/modules/deal-health/deal-health-service";
 import { DealHealthCard } from "@/components/deal-health/deal-health-card";
 import { NegotiationPanel } from "@/components/quotations/negotiation-panel";
@@ -124,6 +128,9 @@ export default async function QuotationDetailPage({
     role: user.role,
     userId: user.id,
   }).catch(() => null);
+
+  const serializedNegotiations = serializeNegotiations(negotiations);
+  const serializedLines = serializeNegotiationLines(quotation.lines);
 
   return (
     <>
@@ -270,12 +277,12 @@ export default async function QuotationDetailPage({
           </CardContent>
         </Card>
 
-        {(negotiations.length > 0 || quotation.status === "UNDER_NEGOTIATION") && (
+        {(serializedNegotiations.length > 0 || quotation.status === "UNDER_NEGOTIATION") && (
           <NegotiationPanel
             quotationId={quotation.id}
             quotationStatus={quotation.status}
-            negotiations={negotiations}
-            lines={quotation.lines}
+            negotiations={serializedNegotiations}
+            lines={serializedLines}
             canAct={canActNegotiation}
           />
         )}

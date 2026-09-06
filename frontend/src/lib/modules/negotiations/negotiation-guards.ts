@@ -130,3 +130,108 @@ export function sanitizeQuotationForCustomer<
     lines: sanitizedLines,
   };
 }
+
+export type RawQuotationLineForNegotiation = {
+  id: string;
+  productId: string;
+  quantity: number;
+  unitPrice: { toString(): string } | number | string;
+  discountPercent: number;
+  product: {
+    id: string;
+    name: string;
+    sku: string;
+    price: { toString(): string } | number | string;
+  };
+};
+
+export type SerializedNegotiationLine = {
+  id: string;
+  productId: string;
+  quantity: number;
+  unitPrice: string;
+  discountPercent: number;
+  product: {
+    id: string;
+    name: string;
+    sku: string;
+    price: string;
+  };
+};
+
+export type RawNegotiationRecord = {
+  id: string;
+  status: import("@prisma/client").NegotiationStatus;
+  message: string;
+  proposedChanges?: unknown;
+  responseMessage: string | null;
+  createdAt: Date | string;
+  actedAt?: Date | string | null;
+  createdBy?: { name: string; email: string } | null;
+  actedBy?: { name: string; email: string } | null;
+};
+
+export type SerializedNegotiationRecord = {
+  id: string;
+  status: import("@prisma/client").NegotiationStatus;
+  message: string;
+  proposedChanges?: unknown;
+  responseMessage: string | null;
+  createdAt: string;
+  actedAt: string | null;
+  createdBy?: { name: string; email: string };
+  actedBy?: { name: string; email: string } | null;
+};
+
+/**
+ * Serializes quotation lines before passing them across the Server Component ->
+ * Client Component boundary (e.g. NegotiationPanel), converting Prisma Decimal
+ * values into plain strings and omitting internal/sensitive cost data.
+ */
+export function serializeNegotiationLines(
+  lines: RawQuotationLineForNegotiation[]
+): SerializedNegotiationLine[] {
+  return lines.map((line) => ({
+    id: line.id,
+    productId: line.productId,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice.toString(),
+    discountPercent: line.discountPercent,
+    product: {
+      id: line.product.id,
+      name: line.product.name,
+      sku: line.product.sku,
+      price: line.product.price.toString(),
+    },
+  }));
+}
+
+/**
+ * Serializes negotiation records before passing them across the Server Component ->
+ * Client Component boundary, ensuring Date instances are converted to ISO strings
+ * and objects are plain JSON-compatible records.
+ */
+export function serializeNegotiations(
+  negotiations: RawNegotiationRecord[]
+): SerializedNegotiationRecord[] {
+  return negotiations.map((n) => ({
+    id: n.id,
+    status: n.status,
+    message: n.message,
+    proposedChanges: n.proposedChanges ?? null,
+    responseMessage: n.responseMessage,
+    createdAt: typeof n.createdAt === "string" ? n.createdAt : n.createdAt.toISOString(),
+    actedAt: n.actedAt
+      ? typeof n.actedAt === "string"
+        ? n.actedAt
+        : n.actedAt.toISOString()
+      : null,
+    createdBy: n.createdBy
+      ? { name: n.createdBy.name, email: n.createdBy.email }
+      : undefined,
+    actedBy: n.actedBy
+      ? { name: n.actedBy.name, email: n.actedBy.email }
+      : null,
+  }));
+}
+

@@ -20,14 +20,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AcceptNegotiationDialog } from "@/components/quotations/accept-negotiation-dialog";
 
-type NegotiationRecord = {
+export type NegotiationRecord = {
   id: string;
   status: import("@prisma/client").NegotiationStatus;
   message: string;
-  proposedChanges: unknown;
+  proposedChanges?: unknown;
   responseMessage: string | null;
-  createdAt: Date | string;
-  actedAt: Date | string | null;
+  createdAt: string;
+  actedAt?: string | null;
   createdBy?: { name: string; email: string };
   actedBy?: { name: string; email: string } | null;
 };
