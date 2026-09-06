@@ -79,6 +79,65 @@ export async function planAgentTask(options: {
   const qId = target?.id ?? options.quotationId ?? null;
   const qNum = target?.quotationNumber ?? "Unknown";
 
+  // Intent 0: Customer & Deal Investigation (e.g. Acme scenario or multi-step investigation)
+  if (
+    p.includes("acme") ||
+    (p.includes("identify") && (p.includes("quotation") || p.includes("anomaly") || p.includes("health") || p.includes("safe"))) ||
+    p.includes("investigate the anomaly")
+  ) {
+    const customerMatch = options.prompt.match(/\b(Acme|Northwind|Bluepeak|Helios|Apex|Vanguard|Stellar|OmniCorp|Meridian|Summit|Quantum|Cascade|Pacific)\b/i);
+    const targetCust = customerMatch ? customerMatch[1] : "Acme";
+
+    return {
+      intent: "INVESTIGATE_CUSTOMER_DEAL",
+      quotationId: qId,
+      quotationNumber: qNum,
+      rationale: `Autonomously investigate customer deal for ${targetCust}, diagnose health anomalies, verify inventory, and determine safe actions vs human approvals.`,
+      steps: [
+        {
+          toolName: "getCustomer",
+          description: `Identify ${targetCust} and find active quotations`,
+          params: { name: targetCust },
+        },
+        {
+          toolName: "getQuotation",
+          description: "Inspect active quotation commercial status and terms",
+          params: { quotationId: qId ?? "DYNAMIC_FROM_CUSTOMER" },
+        },
+        {
+          toolName: "getDealHealth",
+          description: "Inspect deal health score, level, and detect anomalies",
+          params: { quotationId: qId ?? "DYNAMIC_FROM_CUSTOMER" },
+        },
+        {
+          toolName: "getDealHealthDetails",
+          description: "Investigate root-cause anomaly metrics (discount overage, inventory shortfall)",
+          params: { quotationId: qId ?? "DYNAMIC_FROM_CUSTOMER" },
+        },
+        {
+          toolName: "getApprovalStatus",
+          description: "Check discount risk governance and pending approval stages",
+          params: { quotationId: qId ?? "DYNAMIC_FROM_CUSTOMER" },
+        },
+        {
+          toolName: "getInventory",
+          description: "Check warehouse inventory levels and stock shortages for quotation lines",
+          params: { quotationId: qId ?? "DYNAMIC_FROM_CUSTOMER" },
+        },
+        {
+          toolName: "getFulfillment",
+          description: "Check fulfillment status, backorders, and allocation progress",
+          params: { quotationId: qId ?? "DYNAMIC_FROM_CUSTOMER" },
+        },
+        {
+          toolName: "getInvoice",
+          description: "Inspect quotation invoices, billing schedules, and overdue amounts",
+          params: { quotationId: qId ?? "DYNAMIC_FROM_CUSTOMER" },
+        },
+      ],
+    };
+  }
+
   // Intent 1: Fulfillment resolution / warehouse allocation
   if (p.includes("fulfill") || p.includes("warehouse") || p.includes("inventory") || p.includes("stock") || p.includes("backorder")) {
     if (!qId) {
